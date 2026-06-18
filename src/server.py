@@ -31,7 +31,7 @@ def create_server(project_id: str) -> Server:
     server = Server("patent-mcp-server")
     client = BigQueryClient(project_id=project_id)
 
-    @server.list_tools()  # type: ignore[misc]
+    @server.list_tools()  # type: ignore[no-untyped-call, untyped-decorator]
     async def list_tools(request: ListToolsRequest) -> list[Tool]:
         return [
             Tool(
@@ -122,7 +122,7 @@ def create_server(project_id: str) -> Server:
             ),
         ]
 
-    @server.call_tool()  # type: ignore[misc]
+    @server.call_tool()  # type: ignore[no-untyped-call, untyped-decorator]
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         try:
             if name == "search_patents":

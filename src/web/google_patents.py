@@ -12,10 +12,11 @@ from html.parser import HTMLParser
 from typing import TYPE_CHECKING
 
 import requests
+
 from models.patent import Citation, ClassificationCode, PatentDetail
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
 
 logger = logging.getLogger(__name__)
 

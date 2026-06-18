@@ -1,0 +1,30 @@
+{
+  "name": "patent-mcp-server",
+  "version": "1.2.0",
+  "description": "Global patent data MCP server — 1.4B records. No API key required.",
+  "vendor": "DeepArchi OPC",
+  "license": "MIT",
+  "homepage": "https://github.com/deeparchi-ai/patent-mcp-server",
+  "runtime": "python",
+  "entrypoint": {
+    "command": "python",
+    "args": ["-m", "src.server"]
+  },
+  "env": {},
+  "capabilities": {
+    "tools": [
+      {
+        "name": "search_patents",
+        "description": "Search 1.4B patents by keyword, country, CPC code, or date range"
+      },
+      {
+        "name": "get_patent",
+        "description": "Get full patent details by publication number (classifications, citations, family)"
+      },
+      {
+        "name": "get_patent_claims",
+        "description": "Get US patent claims text by publication number"
+      }
+    ]
+  }
+}

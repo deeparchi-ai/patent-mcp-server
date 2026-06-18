@@ -8,3 +8,7 @@ dist/
 .mypy_cache/
 .ruff_cache/
 *.log
+
+# Local-only scripts with credentials
+run.sh
+run-http.sh

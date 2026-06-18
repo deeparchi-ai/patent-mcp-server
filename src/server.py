@@ -1,10 +1,12 @@
 """Patent MCP Server — AI Agent 入口。
 
 Registers: search_patents, get_patent, get_patent_claims.
+Transport: stdio (default) or HTTP/SSE (--transport http --port 8090).
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import os
@@ -20,7 +22,8 @@ from mcp.types import (
 )
 
 from bigquery.client import BigQueryClient, BigQueryError, PatentNotFoundError
-from web.google_patents import fetch_patent as web_fetch_patent, fetch_claims as web_fetch_claims
+from web.google_patents import fetch_claims as web_fetch_claims
+from web.google_patents import fetch_patent as web_fetch_patent
 
 logger = logging.getLogger("patent-mcp-server")
 
@@ -148,7 +151,10 @@ def create_server(project_id: str) -> Server:
                     result = web_fetch_patent(pub)
                     source = "web"
                 except Exception as web_err:
-                    logger.info("Web fetch failed for %s: %s — falling back to BigQuery", pub, web_err)
+                    logger.info(
+                        "Web fetch failed for %s: %s — falling back to BigQuery",
+                        pub, web_err,
+                    )
                     try:
                         result = await client.get_patent(pub)
                         source = "bigquery"
@@ -156,7 +162,10 @@ def create_server(project_id: str) -> Server:
                         return [
                             TextContent(
                                 type="text",
-                                text=json.dumps({"error": "not_found", "message": f"Patent not found: {pub}"}),
+                                text=json.dumps(
+                                    {"error": "not_found",
+                                     "message": f"Patent not found: {pub}"}
+                                ),
                             )
                         ]
 
@@ -173,7 +182,10 @@ def create_server(project_id: str) -> Server:
                     claims = web_fetch_claims(pub)
                     source = "web"
                 except Exception as web_err:
-                    logger.info("Web claims fetch failed for %s: %s — falling back to BigQuery", pub, web_err)
+                    logger.info(
+                        "Web claims fetch failed for %s: %s — falling back to BigQuery",
+                        pub, web_err,
+                    )
                     claims = await client.get_patent_claims(pub)
                     source = "bigquery"
 
@@ -230,8 +242,8 @@ def create_server(project_id: str) -> Server:
     return server
 
 
-async def main() -> None:
-    """Entry point: start MCP server on stdio transport."""
+async def main_stdio() -> None:
+    """Start MCP server on stdio transport (for Hermes native MCP client)."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -242,11 +254,96 @@ async def main() -> None:
         logger.error("GCP_PROJECT_ID environment variable is required")
         sys.exit(1)
 
-    logger.info("Starting patent-mcp-server (project=%s)", GCP_PROJECT_ID)
+    logger.info("Starting patent-mcp-server on stdio (project=%s)", GCP_PROJECT_ID)
     server = create_server(GCP_PROJECT_ID)
 
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
+
+
+async def main_http(port: int, host: str = "0.0.0.0") -> None:
+    """Start MCP server on HTTP/SSE transport (for remote MCP clients)."""
+    from mcp.server.sse import SseServerTransport
+    from starlette.applications import Starlette
+    from starlette.responses import Response
+    from starlette.routing import Mount, Route
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        stream=sys.stderr,
+    )
+
+    if not GCP_PROJECT_ID:
+        logger.error("GCP_PROJECT_ID environment variable is required")
+        sys.exit(1)
+
+    server = create_server(GCP_PROJECT_ID)
+    sse = SseServerTransport("/messages/")
+
+
+    async def sse_app(scope: Any, receive: Any, send: Any) -> None:
+        async with sse.connect_sse(scope, receive, send) as streams:
+            await server.run(
+                streams[0], streams[1], server.create_initialization_options()
+            )
+
+    async def handle_health(request: Any) -> Response:
+        return Response(
+            '{"status":"ok","server":"patent-mcp-server"}',
+            media_type="application/json",
+        )
+
+    app = Starlette(
+        debug=False,
+        routes=[
+            Mount("/sse", app=sse_app),
+            Mount("/messages/", app=sse.handle_post_message),
+            Route("/health", endpoint=handle_health),
+        ],
+    )
+
+    import uvicorn
+
+    logger.info(
+        "Starting patent-mcp-server on HTTP/SSE (host=%s, port=%d, project=%s)",
+        host, port, GCP_PROJECT_ID,
+    )
+    config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    server_uv = uvicorn.Server(config)
+    await server_uv.serve()
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Patent MCP Server")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default="stdio",
+        help="Transport protocol (default: stdio)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8090,
+        help="HTTP port (default: 8090, only used with --transport http)",
+    )
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="HTTP bind host (default: 0.0.0.0)",
+    )
+    return parser.parse_args()
+
+
+async def main() -> None:
+    """Entry point: dispatch to stdio or HTTP transport based on CLI args."""
+    args = parse_args()
+
+    if args.transport == "http":
+        await main_http(port=args.port, host=args.host)
+    else:
+        await main_stdio()
 
 
 if __name__ == "__main__":

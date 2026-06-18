@@ -1,0 +1,6 @@
+#!/bin/bash
+# patent-mcp-server HTTP/SSE wrapper — copy to run-http.sh and fill in your GCP details
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/gcp-service-account.json"
+export GCP_PROJECT_ID="your-gcp-project-id"
+cd "$(dirname "$0")" || exit 1
+exec python -m src.server --transport http --port "${PORT:-8090}" --host "${HOST:-0.0.0.0}"

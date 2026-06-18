@@ -171,7 +171,7 @@ class BigQueryClient:
                 "search_patents requires at least one filter "
                 "(country, cpc, or after) to control scan cost"
             )
-        return search_patents_query(
+        return search_patents_query(  # type: ignore[no-any-return]
             query=query,
             country=country,
             cpc=cpc,
@@ -183,13 +183,13 @@ class BigQueryClient:
 
     @staticmethod
     def get_patent_sql(publication_number: str) -> tuple[str, list[ScalarQueryParameter]]:
-        return get_patent_query(publication_number)
+        return get_patent_query(publication_number)  # type: ignore[no-any-return]
 
     @staticmethod
     def get_patent_claims_sql(
         publication_number: str,
     ) -> tuple[str, list[ScalarQueryParameter]]:
-        return get_patent_claims_query(publication_number)
+        return get_patent_claims_query(publication_number)  # type: ignore[no-any-return]
 
     # ── Query execution ────────────────────────────────────────────
 
@@ -234,5 +234,5 @@ class BigQueryClient:
 
     async def close(self) -> None:
         if self._client is not None:
-            self._client.close()
+            self._client.close()  # type: ignore[no-untyped-call]
             self._client = None

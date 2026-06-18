@@ -140,6 +140,6 @@ def get_patent_claims_query(publication_number: str) -> tuple[str, list[ScalarQu
         JOIN `patents-public-data.patentsview.patent` AS p
           ON c.patent_id = p.id
         WHERE p.number = @patent_number
-        ORDER BY c.sequence
+        ORDER BY CAST(c.sequence AS INT64)
     """
     return sql, params

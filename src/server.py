@@ -153,7 +153,8 @@ def create_server(project_id: str) -> Server:
                 except Exception as web_err:
                     logger.info(
                         "Web fetch failed for %s: %s — falling back to BigQuery",
-                        pub, web_err,
+                        pub,
+                        web_err,
                     )
                     try:
                         result = await client.get_patent(pub)
@@ -163,8 +164,7 @@ def create_server(project_id: str) -> Server:
                             TextContent(
                                 type="text",
                                 text=json.dumps(
-                                    {"error": "not_found",
-                                     "message": f"Patent not found: {pub}"}
+                                    {"error": "not_found", "message": f"Patent not found: {pub}"}
                                 ),
                             )
                         ]
@@ -184,7 +184,8 @@ def create_server(project_id: str) -> Server:
                 except Exception as web_err:
                     logger.info(
                         "Web claims fetch failed for %s: %s — falling back to BigQuery",
-                        pub, web_err,
+                        pub,
+                        web_err,
                     )
                     claims = await client.get_patent_claims(pub)
                     source = "bigquery"
@@ -281,12 +282,9 @@ async def main_http(port: int, host: str = "0.0.0.0") -> None:
     server = create_server(GCP_PROJECT_ID)
     sse = SseServerTransport("/messages/")
 
-
     async def sse_app(scope: Any, receive: Any, send: Any) -> None:
         async with sse.connect_sse(scope, receive, send) as streams:
-            await server.run(
-                streams[0], streams[1], server.create_initialization_options()
-            )
+            await server.run(streams[0], streams[1], server.create_initialization_options())
 
     async def handle_health(request: Any) -> Response:
         return Response(
@@ -307,7 +305,9 @@ async def main_http(port: int, host: str = "0.0.0.0") -> None:
 
     logger.info(
         "Starting patent-mcp-server on HTTP/SSE (host=%s, port=%d, project=%s)",
-        host, port, GCP_PROJECT_ID,
+        host,
+        port,
+        GCP_PROJECT_ID,
     )
     config = uvicorn.Config(app, host=host, port=port, log_level="info")
     server_uv = uvicorn.Server(config)

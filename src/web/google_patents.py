@@ -114,8 +114,8 @@ def fetch_patent(publication_number: str) -> PatentDetail:
     # Convention: last contributor is assignee, rest are inventors.
     contributors = meta.get("DC.contributor", [])
     inventors: list[str] = contributors[:-1] if len(contributors) > 1 else contributors
-    assignee = contributors[-1] if len(contributors) > 1 else (
-        contributors[0] if contributors else None
+    assignee = (
+        contributors[-1] if len(contributors) > 1 else (contributors[0] if contributors else None)
     )
 
     # CPC codes: extract from classification links in HTML

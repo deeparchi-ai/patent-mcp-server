@@ -41,22 +41,16 @@ def search_patents_query(
 
     # CPC filter — match prefix
     if cpc:
-        conditions.append(
-            "EXISTS (SELECT 1 FROM UNNEST(cpc) WHERE code LIKE @cpc)"
-        )
+        conditions.append("EXISTS (SELECT 1 FROM UNNEST(cpc) WHERE code LIKE @cpc)")
         params.append(ScalarQueryParameter("cpc", "STRING", f"{cpc}%"))
 
     # Date range
     if after:
         conditions.append("filing_date >= @after")
-        params.append(
-            ScalarQueryParameter("after", "INT64", int(after.replace("-", "")))
-        )
+        params.append(ScalarQueryParameter("after", "INT64", int(after.replace("-", ""))))
     if before:
         conditions.append("filing_date <= @before")
-        params.append(
-            ScalarQueryParameter("before", "INT64", int(before.replace("-", "")))
-        )
+        params.append(ScalarQueryParameter("before", "INT64", int(before.replace("-", ""))))
 
     # Status filter
     if status:

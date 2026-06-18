@@ -43,7 +43,9 @@ def _int_to_date(value: int | None) -> date | None:
     return date(int(s[:4]), int(s[4:6]), int(s[6:8]))
 
 
-def _build_patent_basic(row: Any, *, url_base: str = "https://patents.google.com/patent") -> PatentBasic:
+def _build_patent_basic(
+    row: Any, *, url_base: str = "https://patents.google.com/patent"
+) -> PatentBasic:
     """Build PatentBasic from a BigQuery row dict."""
     pub = str(row["publication_number"])
 

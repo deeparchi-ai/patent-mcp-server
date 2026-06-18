@@ -18,7 +18,7 @@ class Citation(BaseModel):
 
     publication_number: str | None = None
     category: str | None = None  # X, Y, A, D, E, P, O, T
-    type: str | None = None      # EXA, APP, ISR, SEA, OPP
+    type: str | None = None  # EXA, APP, ISR, SEA, OPP
     npl_text: str | None = None  # non-patent literature text
 
 

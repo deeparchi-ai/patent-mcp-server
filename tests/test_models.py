@@ -132,9 +132,7 @@ class TestPatentDetail:
             abstract="Test",
             country_code="US",
             citations=[
-                Citation(
-                    npl_text="Smith et al., 'Neural Networks', Journal of AI, 2017"
-                ),
+                Citation(npl_text="Smith et al., 'Neural Networks', Journal of AI, 2017"),
             ],
         )
         assert d.citations[0].publication_number is None

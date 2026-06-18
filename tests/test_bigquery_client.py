@@ -1,6 +1,5 @@
 """Tests for BigQuery client — all mock-based, no quota consumed."""
 
-
 import pytest
 
 from bigquery.client import BigQueryClient, BigQueryError, PatentNotFoundError
@@ -44,9 +43,7 @@ class TestSearchPatentsValidation:
 
     def test_accepts_country_only_without_query(self) -> None:
         """Country-only search should work (landscape browsing)."""
-        sql, params = BigQueryClient(project_id="test").search_patents_sql(
-            country="CN", limit=5
-        )
+        sql, params = BigQueryClient(project_id="test").search_patents_sql(country="CN", limit=5)
         assert "country_code" in sql
         assert "LIMIT" in sql
 

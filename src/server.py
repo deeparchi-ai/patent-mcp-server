@@ -38,16 +38,18 @@ def create_server(project_id: str) -> Server:
                 name="search_patents",
                 description=(
                     "Search global patents by keyword, country, CPC classification, or date range. "
-                    "At least one of country, cpc, or after must be provided to control query cost. "
-                    "Returns patent summaries with titles, abstracts, inventors, assignees, and CPC codes. "
-                    "CN patents include Chinese titles and abstracts."
+                    "At least one of country, cpc, or after must be provided to control query cost."
+                    " Returns patent summaries with titles, abstracts, inventors, assignees,"
+                    " and CPC codes. CN patents include Chinese titles and abstracts."
                 ),
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Optional keyword/technology area/inventor name to search",
+                            "description": (
+                                "Optional keyword/technology area/inventor name to search"
+                            ),
                         },
                         "country": {
                             "type": "string",
@@ -82,16 +84,19 @@ def create_server(project_id: str) -> Server:
                 name="get_patent",
                 description=(
                     "Get full patent details by publication number (DOCDB format). "
-                    "Returns classifications, citations (with X/Y/A/D markers for prior art analysis), "
-                    "family ID, dates, inventors, assignees. "
-                    "Use X/Y citation categories: X=relevant if taken alone, Y=relevant if combined."
+                    "Returns classifications, citations,"
+                    " family ID, dates, inventors, assignees."
+                    " Citations include X/Y/A/D markers for prior art analysis."
+                    " X=relevant if taken alone, Y=relevant if combined."
                 ),
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "publication_number": {
                             "type": "string",
-                            "description": "Patent publication number, e.g. 'US-7650331-B1', 'CN-103257828-A'",
+                            "description": (
+                                "Patent publication number, e.g. 'US-7650331-B1', 'CN-103257828-A'"
+                            ),
                         },
                     },
                     "required": ["publication_number"],
@@ -131,52 +136,70 @@ def create_server(project_id: str) -> Server:
                     limit=min(int(arguments.get("limit", 10)), 50),
                 )
                 data = [r.model_dump(mode="json") for r in result]
-                return [TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))]
+                return [
+                    TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))
+                ]
 
             elif name == "get_patent":
                 pub = str(arguments["publication_number"])
                 result = await client.get_patent(pub)
-                return [TextContent(
-                    type="text",
-                    text=result.model_dump_json(indent=2),
-                )]
+                return [
+                    TextContent(
+                        type="text",
+                        text=result.model_dump_json(indent=2),
+                    )
+                ]
 
             elif name == "get_patent_claims":
                 pub = str(arguments["publication_number"])
                 claims = await client.get_patent_claims(pub)
                 if not claims:
                     note = " (Note: claims data may only be available for US patents)"
-                    return [TextContent(
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {"publication_number": pub, "claims": [], "note": note.strip()}
+                            ),
+                        )
+                    ]
+                return [
+                    TextContent(
                         type="text",
-                        text=json.dumps({"publication_number": pub, "claims": [], "note": note.strip()}),
-                    )]
-                return [TextContent(
-                    type="text",
-                    text=json.dumps({"publication_number": pub, "claims": claims}),
-                )]
+                        text=json.dumps({"publication_number": pub, "claims": claims}),
+                    )
+                ]
 
             else:
-                return [TextContent(
-                    type="text",
-                    text=json.dumps({"error": f"Unknown tool: {name}"}),
-                )]
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"error": f"Unknown tool: {name}"}),
+                    )
+                ]
 
         except PatentNotFoundError as e:
-            return [TextContent(
-                type="text",
-                text=json.dumps({"error": "not_found", "message": str(e)}),
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"error": "not_found", "message": str(e)}),
+                )
+            ]
         except BigQueryError as e:
             logger.error("BigQuery error: %s", e)
-            return [TextContent(
-                type="text",
-                text=json.dumps({"error": "bigquery_error", "message": str(e)}),
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"error": "bigquery_error", "message": str(e)}),
+                )
+            ]
         except ValueError as e:
-            return [TextContent(
-                type="text",
-                text=json.dumps({"error": "invalid_input", "message": str(e)}),
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"error": "invalid_input", "message": str(e)}),
+                )
+            ]
 
     return server
 
@@ -202,4 +225,5 @@ async def main() -> None:
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

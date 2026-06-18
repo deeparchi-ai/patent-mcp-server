@@ -1,7 +1,6 @@
 """Pydantic models for patent data."""
 
 from datetime import date
-from typing import Optional
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -17,10 +16,10 @@ class ClassificationCode(BaseModel):
 class Citation(BaseModel):
     """Patent or NPL citation with X/Y/A/D category markers."""
 
-    publication_number: Optional[str] = None
-    category: Optional[str] = None  # X, Y, A, D, E, P, O, T
-    type: Optional[str] = None      # EXA, APP, ISR, SEA, OPP
-    npl_text: Optional[str] = None  # non-patent literature text
+    publication_number: str | None = None
+    category: str | None = None  # X, Y, A, D, E, P, O, T
+    type: str | None = None      # EXA, APP, ISR, SEA, OPP
+    npl_text: str | None = None  # non-patent literature text
 
 
 class PatentBasic(BaseModel):
@@ -31,11 +30,11 @@ class PatentBasic(BaseModel):
     abstract: str
     country_code: str
 
-    zh_title: Optional[str] = None
-    zh_abstract: Optional[str] = None
-    filing_date: Optional[date] = None
-    grant_date: Optional[date] = None
-    assignee: Optional[str] = None
+    zh_title: str | None = None
+    zh_abstract: str | None = None
+    filing_date: date | None = None
+    grant_date: date | None = None
+    assignee: str | None = None
     inventors: list[str] = Field(default_factory=list)
     cpc_codes: list[str] = Field(default_factory=list)
 
@@ -48,12 +47,12 @@ class PatentBasic(BaseModel):
 class PatentDetail(PatentBasic):
     """Full patent detail including classifications and citations."""
 
-    kind_code: Optional[str] = None
-    application_number: Optional[str] = None
-    family_id: Optional[str] = None
-    priority_date: Optional[date] = None
-    entity_status: Optional[str] = None
-    art_unit: Optional[str] = None
+    kind_code: str | None = None
+    application_number: str | None = None
+    family_id: str | None = None
+    priority_date: date | None = None
+    entity_status: str | None = None
+    art_unit: str | None = None
     classifications: list[ClassificationCode] = Field(default_factory=list)
     citations: list[Citation] = Field(default_factory=list)
 

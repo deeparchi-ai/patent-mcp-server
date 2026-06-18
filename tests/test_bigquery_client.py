@@ -1,10 +1,8 @@
 """Tests for BigQuery client — all mock-based, no quota consumed."""
 
-import pytest
-from datetime import date
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from models.patent import PatentBasic, PatentDetail, Citation, ClassificationCode
+import pytest
+
 from bigquery.client import BigQueryClient, BigQueryError, PatentNotFoundError
 
 

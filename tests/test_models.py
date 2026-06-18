@@ -1,16 +1,15 @@
 """Tests for Pydantic patent data models."""
 
-import pytest
 from datetime import date
 
 # These will fail on first run — model classes not defined yet
 from models.patent import (
-    ClassificationCode,
     Citation,
+    CitationGraph,
+    ClassificationCode,
     PatentBasic,
     PatentDetail,
     PatentFamily,
-    CitationGraph,
 )
 
 

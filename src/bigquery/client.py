@@ -10,9 +10,9 @@ from google.cloud import bigquery
 from google.cloud.bigquery import ScalarQueryParameter
 
 from bigquery.queries import (
-    search_patents_query,
-    get_patent_query,
     get_patent_claims_query,
+    get_patent_query,
+    search_patents_query,
 )
 from models.patent import (
     Citation,

@@ -122,7 +122,7 @@ def create_server(project_id: str) -> Server:
             ),
         ]
 
-    @server.call_tool()  # type: ignore[no-untyped-call, untyped-decorator]
+    @server.call_tool()  # type: ignore[untyped-decorator]
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         try:
             if name == "search_patents":

@@ -20,6 +20,7 @@ from mcp.types import (
 )
 
 from bigquery.client import BigQueryClient, BigQueryError, PatentNotFoundError
+from web.google_patents import fetch_patent as web_fetch_patent, fetch_claims as web_fetch_claims
 
 logger = logging.getLogger("patent-mcp-server")
 
@@ -142,19 +143,42 @@ def create_server(project_id: str) -> Server:
 
             elif name == "get_patent":
                 pub = str(arguments["publication_number"])
-                result = await client.get_patent(pub)
+                # Try web first (free), fallback to BigQuery for CPC codes + full metadata
+                try:
+                    result = web_fetch_patent(pub)
+                    source = "web"
+                except Exception as web_err:
+                    logger.info("Web fetch failed for %s: %s — falling back to BigQuery", pub, web_err)
+                    try:
+                        result = await client.get_patent(pub)
+                        source = "bigquery"
+                    except PatentNotFoundError:
+                        return [
+                            TextContent(
+                                type="text",
+                                text=json.dumps({"error": "not_found", "message": f"Patent not found: {pub}"}),
+                            )
+                        ]
+
+                data = result.model_dump(mode="json")
+                data["_source"] = source
                 return [
-                    TextContent(
-                        type="text",
-                        text=result.model_dump_json(indent=2),
-                    )
+                    TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))
                 ]
 
             elif name == "get_patent_claims":
                 pub = str(arguments["publication_number"])
-                claims = await client.get_patent_claims(pub)
+                # Try web first (free, saves ~35 GB BigQuery join)
+                try:
+                    claims = web_fetch_claims(pub)
+                    source = "web"
+                except Exception as web_err:
+                    logger.info("Web claims fetch failed for %s: %s — falling back to BigQuery", pub, web_err)
+                    claims = await client.get_patent_claims(pub)
+                    source = "bigquery"
+
                 if not claims:
-                    note = " (Note: claims data may only be available for US patents)"
+                    note = " (Note: claims data may only be available for US/WO patents)"
                     return [
                         TextContent(
                             type="text",
@@ -166,7 +190,9 @@ def create_server(project_id: str) -> Server:
                 return [
                     TextContent(
                         type="text",
-                        text=json.dumps({"publication_number": pub, "claims": claims}),
+                        text=json.dumps(
+                            {"publication_number": pub, "claims": claims, "_source": source}
+                        ),
                     )
                 ]
 

@@ -109,16 +109,16 @@ def create_server(project_id: str) -> Server:
             Tool(
                 name="get_patent_claims",
                 description=(
-                    "Get US patent claims text by publication number. "
+                    "Get patent claims text by publication number. "
                     "Claims define the legal scope of patent protection. "
-                    "Note: Claims are only available for US patents. CN patents will return empty."
+                    "Supports US, CN, and most other countries via Google Patents."
                 ),
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "publication_number": {
                             "type": "string",
-                            "description": "US patent publication number, e.g. 'US-7650331-B1'",
+                            "description": "Patent publication number, e.g. 'US-7650331-B1', 'CN-103257828-A'",
                         },
                     },
                     "required": ["publication_number"],
@@ -191,7 +191,7 @@ def create_server(project_id: str) -> Server:
                     source = "bigquery"
 
                 if not claims:
-                    note = " (Note: claims data may only be available for US/WO patents)"
+                    note = " (Note: claims text not found for this patent)"
                     return [
                         TextContent(
                             type="text",

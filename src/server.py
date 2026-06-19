@@ -148,7 +148,7 @@ def create_server(project_id: str) -> Server:
                 pub = str(arguments["publication_number"])
                 # Try web first (free), fallback to BigQuery for CPC codes + full metadata
                 try:
-                    result = web_fetch_patent(pub)
+                    result = await asyncio.to_thread(web_fetch_patent, pub)
                     source = "web"
                 except Exception as web_err:
                     logger.info(
@@ -179,7 +179,7 @@ def create_server(project_id: str) -> Server:
                 pub = str(arguments["publication_number"])
                 # Try web first (free, saves ~35 GB BigQuery join)
                 try:
-                    claims = web_fetch_claims(pub)
+                    claims = await asyncio.to_thread(web_fetch_claims, pub)
                     source = "web"
                 except Exception as web_err:
                     logger.info(

@@ -1,5 +1,5 @@
 [project]
-name = "patent-mcp-server"
+name = "deeparchi-patent-mcp"
 version = "1.4.0"
 description = "MCP Server for global patent data retrieval and analysis"
 readme = "README.md"

@@ -120,8 +120,7 @@ def create_server(project_id: str) -> Server:
                         "publication_number": {
                             "type": "string",
                             "description": (
-                                "Patent publication number, "
-                                "e.g. 'US-7650331-B1', 'CN-103257828-A'"
+                                "Patent publication number, e.g. 'US-7650331-B1', 'CN-103257828-A'"
                             ),
                         },
                     },

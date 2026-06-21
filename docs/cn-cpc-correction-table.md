@@ -1,6 +1,5 @@
 # CN Patent CPC Correction Table
 
-> **Patent MCP 独有 artifact — Google 和 PatSnap 都没有的公开文档。**
 > 基于 BigQuery `patents-public-data.patents.publications` 实际查询验证。
 > 最后更新：2026-06-21
 
@@ -90,5 +89,3 @@ BigQuery 的 CPC 分类覆盖对 CN（中国）专利**不完整**。Google Pate
 - **权利要求中文版不可得。** Google Patents 网页版提供机器翻译英文版权利要求，但中文原件不可得
 
 ---
-
-> **这个文档就是 Patent MCP 的护城河。** 不是代码行数，不是工具数量。是这些 Google 不需要、PatSnap 不公开、但每一个做 CN 专利搜索的人都会踩到的坑。

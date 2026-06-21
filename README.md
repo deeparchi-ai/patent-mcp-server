@@ -1,13 +1,15 @@
 # Patent MCP Server
 
-> 🚀 **Clone. Install. Done.** Give your AI agent the ability to read global patents — no API key, no cloud, no external service.
+> 🚀 **中国专利最准确的开源 MCP。** Give your AI agent the ability to read CN patents with real accuracy — plus global coverage.
+
+> ⚠️ **Honest disclosure:** Global coverage is a stretch goal. What's real today: CN patents with CPC-aware search, US/WO patent details and claims, and a public CPC correction table (see `docs/cn-cpc-correction-table.md`) that Google and PatSnap don't publish.
 
 [![Tests](https://img.shields.io/badge/tests-32%2F32-brightgreen)](https://github.com/deeparchi-ai/patent-mcp-server/actions)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-purple)](https://modelcontextprotocol.io/)
 
-An MCP (Model Context Protocol) server that gives AI agents access to global patent data — **1.4 billion patent records**, Chinese full-text included. Runs locally on your machine. No external API, no subscription.
+An MCP (Model Context Protocol) server that gives AI agents access to patent data — **CN patents with CPC-aware correction**, plus US/WO global coverage. Runs locally on your machine. No external API, no subscription. Always MIT.
 
 ---
 
@@ -140,21 +142,23 @@ get_patent(publication_number="US-7650331-B1")
 
 Returns: classifications, citations (X/Y/A/D prior art markers), family ID, dates, inventors, assignees. Cites prior art markers so your agent can assess novelty at a glance.
 
+**CN patent note:** Google Patents web scraping provides machine-translated English data for CN patents. CPC codes from web scraping are empty (JS-rendered). For CPC, use BigQuery path.
+
 ### `get_patent_claims`
 
 ```
 get_patent_claims(publication_number="US-7650331-B1")
 ```
 
-Returns: full claims text. (US patents only; non-US return empty.)
+Returns: full claims text. Supports US, CN (machine-translated English), and most countries via Google Patents web scraping.
 
 ### `search_patents`
 
 ```
-search_patents(query="transformer attention", country="CN", after="2023-01-01", limit=5)
+search_patents(cpc="G06N", country="CN", after="2023-01-01", limit=5)
 ```
 
-CN results include Chinese titles and abstracts. At least one of `country`, `cpc`, or `after` is required.
+Search 1.4B patents. **⚠️ Important for CN:** use CPC class codes (e.g., `G06N`), not keywords. CN keyword search is unreliable due to BigQuery CN text indexing gaps. See [`docs/cn-cpc-correction-table.md`](docs/cn-cpc-correction-table.md) for tested CPC codes and known deviations.
 
 ---
 

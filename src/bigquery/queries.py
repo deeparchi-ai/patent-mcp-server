@@ -94,7 +94,8 @@ def search_patents_query(
             grant_date,
             inventor_harmonized,
             assignee_harmonized,
-            country_code
+            country_code,
+            cpc
         FROM {table}
         WHERE {where}
         LIMIT {limit}

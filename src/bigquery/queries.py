@@ -29,11 +29,15 @@ def search_patents_query(
     conditions: list[str] = []
     table = "`patents-public-data.patents.publications`"
 
-    # Keyword search on English abstract
+    # Keyword search on BOTH English AND Chinese abstracts.
+    # CN patent English abstracts are often sparse/machine-translated,
+    # so searching zh abstract is essential for Chinese keyword queries.
     if query:
         conditions.append(
-            "LOWER((SELECT text FROM UNNEST(abstract_localized) "
-            "WHERE language='en' LIMIT 1)) LIKE LOWER(@query)"
+            "(LOWER((SELECT text FROM UNNEST(abstract_localized) "
+            "WHERE language='en' LIMIT 1)) LIKE LOWER(@query) "
+            "OR LOWER((SELECT text FROM UNNEST(abstract_localized) "
+            "WHERE language='zh' LIMIT 1)) LIKE LOWER(@query))"
         )
         params.append(ScalarQueryParameter("query", "STRING", f"%{query}%"))
 

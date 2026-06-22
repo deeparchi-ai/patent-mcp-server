@@ -35,6 +35,26 @@ class TestSearchPatentsValidation:
         )
         assert "cpc" in sql.lower()
 
+    def test_accepts_assignee_only_without_query(self) -> None:
+        """Assignee-only search for company-level patent landscape."""
+        sql, params = BigQueryClient(project_id="test").search_patents_sql(
+            assignee="BOE", limit=5
+        )
+        assert "@assignee" in sql
+        assert "REGEXP_CONTAINS" in sql
+        assert "assignee_harmonized" in sql
+        assert "LIMIT" in sql
+        # Verify (^| )word( |$) boundary regex in parameter (lowercased)
+        assert params[-1].value == "(^| )boe( |$)"
+
+    def test_assignee_no_longer_matches_substring(self) -> None:
+        """Space-anchored regex: BOE should NOT match BOEING."""
+        sql, params = BigQueryClient(project_id="test").search_patents_sql(
+            assignee="BOE", country="US", limit=5
+        )
+        assert "REGEXP_CONTAINS" in sql
+        assert params[0].value == "(^| )boe( |$)"
+
     def test_accepts_keyword_with_date(self) -> None:
         sql, params = BigQueryClient(project_id="test").search_patents_sql(
             "blockchain", after="2020-01-01"

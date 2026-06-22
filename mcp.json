@@ -1,7 +1,7 @@
 {
   "name": "patent-mcp-server",
-  "version": "1.2.0",
-  "description": "Global patent data MCP server — 1.4B records. No API key required.",
+  "version": "1.5.1",
+  "description": "Global patent data MCP server — 1.4B records. Search by keyword, country, CPC, assignee, or date range. No API key required.",
   "vendor": "DeepArchi OPC",
   "license": "MIT",
   "homepage": "https://github.com/deeparchi-ai/patent-mcp-server",

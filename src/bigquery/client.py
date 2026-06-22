@@ -159,6 +159,7 @@ class BigQueryClient:
     def search_patents_sql(
         query: str | None = None,
         *,
+        assignee: str | None = None,
         country: str | None = None,
         cpc: str | None = None,
         after: str | None = None,
@@ -166,13 +167,14 @@ class BigQueryClient:
         status: str | None = None,
         limit: int = 10,
     ) -> tuple[str, list[ScalarQueryParameter]]:
-        if not any([country, cpc, after]) and query:
+        if not any([country, cpc, after, assignee]) and query:
             raise ValueError(
                 "search_patents requires at least one filter "
-                "(country, cpc, or after) to control scan cost"
+                "(country, cpc, after, or assignee) to control scan cost"
             )
         return search_patents_query(  # type: ignore[no-any-return]
             query=query,
+            assignee=assignee,
             country=country,
             cpc=cpc,
             after=after,
@@ -197,6 +199,7 @@ class BigQueryClient:
         self,
         query: str | None = None,
         *,
+        assignee: str | None = None,
         country: str | None = None,
         cpc: str | None = None,
         after: str | None = None,
@@ -206,6 +209,7 @@ class BigQueryClient:
     ) -> list[PatentBasic]:
         sql, params = self.search_patents_sql(
             query=query,
+            assignee=assignee,
             country=country,
             cpc=cpc,
             after=after,

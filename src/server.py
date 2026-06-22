@@ -56,6 +56,13 @@ def create_server(project_id: str) -> Server:
                                 "Optional keyword/technology area/inventor name to search"
                             ),
                         },
+                        "assignee": {
+                            "type": "string",
+                            "description": (
+                                "Optional assignee/organization name filter (fuzzy match on harmonized names). "
+                                "Use for company-level or city-level analysis, e.g. 'HEFEI', 'BOE', 'HUAWEI'."
+                            ),
+                        },
                         "country": {
                             "type": "string",
                             "description": "Country code filter, e.g. 'CN', 'US', 'EP'",
@@ -135,6 +142,7 @@ def create_server(project_id: str) -> Server:
             if name == "search_patents":
                 result = await client.search_patents(
                     query=arguments.get("query"),
+                    assignee=arguments.get("assignee"),
                     country=arguments.get("country"),
                     cpc=arguments.get("cpc"),
                     after=arguments.get("after"),

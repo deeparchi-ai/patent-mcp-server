@@ -1,5 +1,7 @@
 """Parameterized BigQuery SQL queries for patent-mcp-server."""
 
+import re
+
 from google.cloud.bigquery import ScalarQueryParameter
 
 
@@ -11,6 +13,7 @@ def _param_type(value: str) -> str:
 def search_patents_query(
     query: str | None = None,
     *,
+    assignee: str | None = None,
     country: str | None = None,
     cpc: str | None = None,
     after: str | None = None,
@@ -20,7 +23,7 @@ def search_patents_query(
 ) -> tuple[str, list[ScalarQueryParameter]]:
     """Build parameterized search query.
 
-    At least one of country/cpc/after must be provided to control scan cost.
+    At least one of assignee/country/cpc/after must be provided to control scan cost.
     """
     params: list[ScalarQueryParameter] = []
     conditions: list[str] = []
@@ -33,6 +36,21 @@ def search_patents_query(
             "WHERE language='en' LIMIT 1)) LIKE LOWER(@query)"
         )
         params.append(ScalarQueryParameter("query", "STRING", f"%{query}%"))
+
+    # Assignee filter — word-boundary match on harmonized assignee names.
+    # RE2 (BigQuery's regex engine) does NOT support \b word boundaries.
+    # Instead use (^| )keyword( |$) which matches:
+    #   - "BOE" in "BOE TECHNOLOGY"  ✓
+    #   - "BOE" in "BEIJING BOE OPTO" ✓
+    #   - "BOE" at end of name       ✓
+    #   - "BOEING" (no space after)  ✗ (correctly excluded)
+    if assignee:
+        escaped = re.escape(assignee.lower()).replace(r"\ ", " ")
+        conditions.append(
+            "EXISTS (SELECT 1 FROM UNNEST(assignee_harmonized) "
+            "WHERE REGEXP_CONTAINS(LOWER(name), @assignee))"
+        )
+        params.append(ScalarQueryParameter("assignee", "STRING", f"(^| ){escaped}( |$)"))
 
     # Country filter
     if country:

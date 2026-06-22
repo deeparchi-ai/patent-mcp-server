@@ -1,9 +1,9 @@
 [project]
 name = "deeparchi-patent-mcp"
-version = "1.4.1"
-description = "MCP Server for global patent data retrieval and analysis"
+version = "1.5.1"
+description = "Global patent MCP server — search 1.4B patents via BigQuery + Google Patents. MIT. Agent-native."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=1.0.0",
@@ -13,6 +13,14 @@ dependencies = [
     "starlette>=0.37.0",
     "uvicorn>=0.30.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/deeparchi-ai/patent-mcp-server"
+Repository = "https://github.com/deeparchi-ai/patent-mcp-server"
+Issues = "https://github.com/deeparchi-ai/patent-mcp-server/issues"
+
+[project.scripts]
+deeparchi-patent-mcp = "server:cli_main"
 
 [project.optional-dependencies]
 dev = [

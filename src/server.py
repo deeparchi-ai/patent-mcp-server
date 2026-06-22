@@ -59,8 +59,10 @@ def create_server(project_id: str) -> Server:
                         "assignee": {
                             "type": "string",
                             "description": (
-                                "Optional assignee/organization name filter (fuzzy match on harmonized names). "
-                                "Use for company-level or city-level analysis, e.g. 'HEFEI', 'BOE', 'HUAWEI'."
+                                "Optional assignee/organization name filter"
+                                " (fuzzy match on harmonized names)."
+                                " Use for company-level or city-level"
+                                " analysis, e.g. 'HEFEI', 'BOE', 'HUAWEI'."
                             ),
                         },
                         "country": {

@@ -1,29 +1,27 @@
 # Patent MCP 搜索最佳实践
 
-> 基于两轮全链路 Demo 实战经验（Agent 沙箱 + Chiplet 互连）总结。
+> 基于两轮全链路 Demo 实战 + v1.7.0 Firecrawl web fallback 更新。
 
 ## 一、核心原则
 
-### 不要用自然语言关键词搜专利
-
-专利摘要的用词习惯和日常技术讨论完全不同。两轮 Demo 证明：
+### 首选 CPC 分类号，关键词做辅助
 
 | 搜索方式 | 耗时 | 命中率 | 示例 |
 |---------|------|--------|------|
-| 自然语言关键词 | 2-4s | **0%（两轮 16 次全空）** | "pre-warmed execution context pool" |
-| CPC 分类号（无关键词） | 2-5s | **100%** | `cpc: G06F21/53` |
-| CPC + 极窄关键词（1-2个词） | 3-8s | 中等 | `cpc: H01L25/065 query: chiplet` |
+| CPC 分类号（无关键词） | 2-5s | **100%** | `cpc: H01L`, `cpc: G06F21/53` |
+| 关键词 + country CN | 3-8s | **可用** | `query: "芯片" country: CN` |
+| 关键词（无 CPC/无约束） | ❌ 拒绝 | — | 必须至少搭配一个过滤参数 |
 
-**结论：首选 CPC 分类号搜，关键词只做 CPC 搜出结果后的二次过滤。**
+### CN 关键词搜索已修复（v1.5.2+）
 
-### 为什么关键词搜不到？
+曾经 `query="芯片" + country=CN` 返回 0 结果（仅搜英文摘要）。现已修复——同时搜索中英文摘要：
 
-BigQuery 中的专利摘要（`abstract_localized`）使用以下语言：
-- 法律化表述："A method comprising..."、"Apparatuses, systems, and techniques to..."
-- 分类导向术语：TEE、enclave、interposer、routing layer
-- 不包含日常讨论中的"预热池"、"自适应"、"沙箱"
+```
+✅ query="芯片" + country=CN            → 有结果
+✅ query="neural network" + country=CN  → 有结果
+```
 
-你写的是 `pre-warmed execution context`，专利里写的是 `uniform enclave interface`——说的根本不是同一套语言。
+但专利摘要用词仍偏法律化/分类导向。"预热执行上下文池"在专利里可能是 "uniform enclave interface"——说的不是同一套语言。关键词仍建议搭配 CPC 使用。
 
 ---
 
@@ -32,7 +30,7 @@ BigQuery 中的专利摘要（`abstract_localized`）使用以下语言：
 ### 推荐流程
 
 ```
-Step 1: CPC 分类号搜（无关键词）→ 拿到候选专利列表
+Step 1: CPC 或关键词搜 → 拿到候选专利列表
         ↓
 Step 2: 从结果中人工/Agent 筛选相关专利号
         ↓
@@ -40,6 +38,15 @@ Step 3: get_patent(publication_number) → 拿全文详情
         ↓
 Step 4: 对照交底书特征逐条分析 → 输出查新简报
 ```
+
+### CN 专利四种搜索路径（v1.7.0）
+
+| 路径 | 示例 | 适用场景 |
+|------|------|---------|
+| **CPC + CN** | `cpc=H01L country=CN after=2023-01-01` | 已知技术分类，覆盖最广 |
+| **关键词 + CN** | `query="芯片" country=CN` | 自然语言探索，搜中英文摘要 |
+| **Assignee + CN** | `assignee="BOE" country=CN` | 企业/城市级专利图谱 |
+| **Web fallback** | `cpc=H01L25/065 country=CN` → BigQuery 拒绝 → 自动 Firecrawl | 细粒度 CPC 无 BQ 覆盖时自动触发 |
 
 ### CPC 分类号速查
 
@@ -57,7 +64,7 @@ Step 4: 对照交底书特征逐条分析 → 输出查新简报
 |------|-----|------|
 | 堆叠器件 | `H01L25/065` | 堆叠半导体器件（Chiplet 核心分类） |
 | 芯片间互连 | `H01L23/538` | IC 芯片间互连 |
-| 多器件组装 | `H01L25/00` | 多个半导体器件组装 |
+| 多器件组装 | `H01L25/00` | 多个半导体器件组装（父类，覆盖更广） |
 | 互连结构 | `H01L23/48` | 互连结构（较宽泛） |
 | 通孔互连 | `H01L21/768` | 垂直互连通孔 |
 
@@ -69,38 +76,84 @@ Step 4: 对照交底书特征逐条分析 → 输出查新简报
 
 ---
 
-## 三、中美数据差异
+## 三、中美数据差异（v1.7.0 更新）
 
 | 维度 | US 专利 | CN 专利 |
 |------|---------|---------|
 | 英文摘要 | ✅ 完整 | ✅ 有（翻译） |
-| 中文摘要检索 | N/A | ⚠️ **不可靠** |
-| CPC 分类覆盖 | ✅ 完整 | ⚠️ 部分 |
-| 关键词匹配 | 需用专利语言 | ❌ 中文关键词基本搜不到 |
-| 可用搜索方式 | CPC + 关键词 | **仅 CPC 无关键词搜** |
+| 中文摘要检索 | N/A | ✅ 可用（v1.5.2 修复，搜中英双语） |
+| CPC 分类覆盖 | ✅ 完整 | ⚠️ 部分（细粒度 CPC 可能 0 结果，父类可用） |
+| 关键词匹配 | 需用专利语言 | 需用专利语言 + 中英双语 |
+| Web fallback | ❌ 不需要 | ✅ Firecrawl 自动回退（v1.7.0） |
 
-**对产品的影响**：BigQuery 对 CN 专利的可检索性存在显著缺口。如果目标市场包含中国，需要补充 CNIPA 或商业数据库（PatSnap、智慧芽）作为数据源。
+**Web fallback 触发条件：** BigQuery dry-run 估算 > 50 GB（例如 `H01L25/065 + CN` → 256 GB），自动走 Firecrawl 网页搜索 → Google Patents 富化。用户无感知。
 
 ---
 
-## 四、性能数据
+## 四、性能数据（v1.7.0 实测）
 
 | 操作 | 典型耗时 | 说明 |
 |------|---------|------|
-| `get_patent` (Web) | 0.7-0.9s | 从 patents.google.com 抓取 ✓ |
+| `get_patent` (Web) | 0.7-0.9s | 从 patents.google.com 抓取 |
 | `get_patent` (BigQuery) | 2.5-3s | 单行查询，稳定 |
 | `get_patent_claims` (Web) | 0.5-1s | 从网页解析权利要求 |
-| `search_patents` (CPC无关键词) | 2-5s | **推荐方式** |
-| `search_patents` (关键词+CPC) | 3-8s | 关键词可能降低召回 |
-| `search_patents` (纯关键词) | 2-4s→**0结果** | 不推荐 |
-
-**注意**：`search_patents` 的 BIGQUERY LIKE 查询扫描 208GB 表，必须搭配 CPC 或 country+date 约束。无约束的关键词搜索会被服务器拒绝。
+| `search_patents` (CPC+CN) | 2-5s | 推荐方式 |
+| `search_patents` (关键词+CN) | 3-8s | 双语言扫描 |
+| `search_patents` (CN web fallback) | 30-45s | Firecrawl 搜索 + Google Patents 富化 × N条 |
+| `search_patents` (纯关键词无约束) | ❌ 拒绝 | 至少需要一个过滤参数 |
 
 ---
 
-## 五、预研工作流模板
+## 五、CN CPC 覆盖缺口
 
-参考 `demos/` 目录中的两个完整案例：
+BigQuery 的 CN CPC 分类不完整——这是 Google 数据层的问题，不是代码 bug。
+
+**已知缺口：** `H01L25/065`（先进封装）→ 0 CN 结果（BigQuery + Google Patents 搜索均 0）
+
+**应对策略：**
+1. **父类 CPC** — `H01L` 替 `H01L25/065`，覆盖广但精度低
+2. **Web fallback** — Firecrawl 网页搜索 "H01L25/065 芯片 封装 中国专利" → 提取专利号 → 富化
+3. **Assignee** — 知道公司名直接 `assignee="TSMC" country=CN`，绕过 CPC 完全
+
+详见 [`docs/cn-cpc-correction-table.md`](docs/cn-cpc-correction-table.md)。
+
+---
+
+## 六、Assignee 搜索：企业/城市级专利图谱（v1.5.1+）
+
+### 典型用法
+
+```
+search_patents(assignee="BOE", country="CN", after="2014-01-01", limit=50)
+```
+
+### 应用场景
+
+| 场景 | assignee 值 | 说明 |
+|------|-----------|------|
+| 单家企业专利全景 | `"BOE"`、`"HUAWEI"` | 模糊匹配，覆盖子公司 |
+| 城市/区域专利地图 | `"HEFEI"`、`"SHENZHEN"` | 大城市 assignee 名里常见地名 |
+| 行业专利对标 | 行业关键词 | 特定行业玩家覆盖 |
+| 组合搜索 | `assignee:"BOE" cpc:"H01L25"` | 企业 × 技术领域交叉 |
+
+**注意：** 模糊匹配 `LIKE %keyword%`，`"BOE"` 可能也匹配 `"BOEING"`——人工去噪。
+
+---
+
+## 七、已知限制
+
+1. **CN 细粒度 CPC 覆盖不足** — BigQuery + Google Patents 层均无数据。Web fallback 弥补
+2. **Web fallback 较慢** — Firecrawl + Google Patents 富化 30-45s，BigQuery 直接查 2-5s
+3. **Firecrawl 消耗 credits** — 4 credits/次 CN 回退查询。Free tier 包含额度
+4. **专利语言门槛** — Agent 需学习专利写作语言。CPC 优先策略规避此问题
+5. **引用链不完整** — BigQuery citations 字段仅部分引用关系
+6. **SearXNG CN 引擎全灭** — Baidu/Google/DDG/Startpage 均被验证码封。已切换 Firecrawl
+
+---
+
+## 八、预研工作流模板
+
+参考 `demos/` 目录中的完整案例：
 
 ```
 ~/.hermes/demos/
@@ -134,40 +187,3 @@ Step 4: 对照交底书特征逐条分析 → 输出查新简报
 ## 四、综合评估（新颖性/侵权风险/授权前景）
 ## 五、建议（权利要求策略 + 补充检索方向）
 ```
-
----
-
-## 六、已知限制
-
-1. **CN 专利覆盖不足**：中文关键词搜索不可用，CPC 分类覆盖不完整。需商业数据库补充
-2. **LIKE 搜索昂贵**：208GB 全表扫描，查询优化依靠 CPC + 日期约束
-3. **MCP 状态机**：Gateway 在连续失败后需要 `/restart` 重置
-4. **专利语言门槛**：Agent 需要学习专利写作语言才能写出有效搜索词——CPC 优先策略规避了这个问题
-5. **引用链不完整**：BigQuery 的 citations 字段只包含部分引用关系，完整引用树需要额外处理
-
----
-
-## 七、Assignee 搜索：企业/城市级专利图谱
-
-> v1.5.1 新增。底层一行 SQL `WHERE LOWER(name) LIKE LOWER(@assignee)`，解锁城市/公司维度的专利分析。
-
-### 典型用法
-
-```
-search_patents(assignee="BOE", country="CN", after="2014-01-01", limit=50)
-```
-
-### 应用场景
-
-| 场景 | assignee 值 | 说明 |
-|------|-----------|------|
-| 单家企业专利全景 | `"BOE"`、`"HUAWEI"` | 模糊匹配，覆盖子公司 |
-| 城市/区域专利地图 | `"HEFEI"`、`"SHENZHEN"` | 大城市的 assignee 名里常见地名关键字 |
-| 行业专利对标 | `"SEMICONDUCTOR"` | 特定行业玩家的专利覆盖 |
-| 组合搜索 | `assignee:"BOE" cpc:"H01L25"` | 企业 × 技术领域交叉 |
-
-### 注意
-
-- 模糊匹配（LIKE `%keyword%`），`"BOE"` 可能也匹配 `"BOEING"`——确认结果时做人工去噪
-- 建议搭配 `country` 或 `after` 缩小结果集
-- assignee 本身可作为成本控制过滤器（无需额外搭配 country/cpc/after）

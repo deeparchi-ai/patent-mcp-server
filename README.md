@@ -2,12 +2,11 @@
 
 > 🚀 **中国专利最准确的开源 MCP。** Give your AI agent the ability to read CN patents with real accuracy — plus global coverage.
 
-> ⚠️ **Honest disclosure:** Global coverage is a stretch goal. What's real today: CN patents with CPC-aware search, US/WO patent details and claims, and a public CPC correction table (see `docs/cn-cpc-correction-table.md`) that Google and PatSnap don't publish.
-
 [![Tests](https://img.shields.io/badge/tests-32%2F32-brightgreen)](https://github.com/deeparchi-ai/patent-mcp-server/actions)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-purple)](https://modelcontextprotocol.io/)
+[![PyPI](https://img.shields.io/badge/pypi-v1.7.0-blue)](https://pypi.org/project/deeparchi-patent-mcp/)
 
 An MCP (Model Context Protocol) server that gives AI agents access to patent data — **CN patents with CPC-aware correction**, plus US/WO global coverage. Runs locally on your machine. No external API, no subscription. Always MIT.
 
@@ -24,6 +23,11 @@ An MCP (Model Context Protocol) server that gives AI agents access to patent dat
 
 ## 30-Second Install
 
+```bash
+pip install deeparchi-patent-mcp
+```
+
+Or from source:
 ```bash
 git clone https://github.com/deeparchi-ai/patent-mcp-server.git
 cd patent-mcp-server
@@ -64,12 +68,6 @@ mcp_servers:
     workdir: "/path/to/patent-mcp-server"
 ```
 
-### Any MCP Client (via mcp.json)
-
-```bash
-mcp-get install deeparchi-ai/patent-mcp-server
-```
-
 ---
 
 Now ask your agent:
@@ -83,10 +81,25 @@ Now ask your agent:
 | Tool | What It Does | Needs Setup? |
 |------|-------------|:---:|
 | `get_patent` | Full patent details: classifications, citations (X/Y/A/D), inventors, assignees, family | No |
-| `get_patent_claims` | US patent claims text — the legal scope of protection | No |
-| `search_patents` | Search 1.4B patents by keyword, country, CPC, date range | Optional GCP |
+| `get_patent_claims` | Patent claims text — legal scope. Supports US, CN, and most countries via Google Patents | No |
+| `search_patents` | Search 1.4B patents by keyword, CPC, assignee, country, date range | Optional GCP |
 
 The first two cover 80% of use cases. Zero cost. Zero setup.
+
+### CN Patent Search (v1.7.0)
+
+Three-layer discovery for Chinese patents:
+
+| Layer | Backend | Cost | When |
+|-------|---------|:---:|------|
+| 1. BigQuery | Google Patents Public Data | Free tier | `cpc=H01L + country=CN` |
+| 2. Firecrawl | Web search fallback | 4 credits/query | BigQuery cost-rejects specific CPC (e.g. H01L25/065) |
+| 3. Google Patents | Detail enrichment via proxy | Free | All patent detail lookups |
+
+- **Keyword search works:** `query="芯片" + country=CN` searches both English AND Chinese abstracts (v1.5.2 fix).
+- **Assignee filter:** `assignee="BOE" + country=CN` → company/city-level patent landscape.
+- **CPC classification:** Use parent CPC classes (`H01L`) for broader CN coverage; specific CPC codes (`H01L25/065`) trigger web fallback.
+- See [`SEARCH_GUIDE.md`](SEARCH_GUIDE.md) for detailed search strategy and tested CPC codes.
 
 ---
 
@@ -132,6 +145,34 @@ A [systemd service template](run-http.sh.example) is included for production dep
 
 ---
 
+## How It Works
+
+```
+┌──────────────┐     ┌───────────────────────────────────────┐
+│  AI Agent    │────▶│  patent-mcp-server                    │
+│  (Claude,    │     │  (runs on YOUR machine)               │
+│   Cursor,    │     │                                       │
+│   Hermes)    │     │  search_patents:                      │
+│              │     │    ┌──────────┐    ┌───────────────┐  │
+│              │     │    │ BigQuery │───▶│ Firecrawl     │  │
+│              │     │    │ (primary)│    │ (CN fallback) │  │
+│              │     │    └──────────┘    └───────┬───────┘  │
+│              │     │                           │           │
+│              │     │  get_patent / get_patent_claims:      │
+│              │     │    ┌──────────────────────┐           │
+│              │     │    │ Google Patents (web) │           │
+│              │     │    │ → BigQuery fallback  │           │
+│              │     │    └──────────────────────┘           │
+└──────────────┘     └───────────────────────────────────────┘
+```
+
+- **Web scraping for details** — fast (~1.5s), free, no credentials
+- **BigQuery for search** — 1.4B records, CN full-text, optional
+- **Firecrawl for CN fallback** — kicks in when BigQuery cost-rejects specific CPC queries
+- **Smart fallback** — every tool tries web first, auto-falls to BigQuery if you have it
+
+---
+
 ## Tools Reference
 
 ### `get_patent`
@@ -156,33 +197,15 @@ Returns: full claims text. Supports US, CN (machine-translated English), and mos
 
 ```
 search_patents(cpc="G06N", country="CN", after="2023-01-01", limit=5)
+search_patents(assignee="TSMC", country="CN")
+search_patents(query="芯片", country="CN")          # keyword search (CN: searches both EN+ZH)
 ```
 
-Search 1.4B patents. **⚠️ Important for CN:** use CPC class codes (e.g., `G06N`), not keywords. CN keyword search is unreliable due to BigQuery CN text indexing gaps. See [`docs/cn-cpc-correction-table.md`](docs/cn-cpc-correction-table.md) for tested CPC codes and known deviations.
+Search 1.4B patents by keyword, CPC classification, assignee, country, date range. For CN patents, keyword search scans both English and Chinese abstracts.
 
----
+**Cost control:** Queries require at least one filter (`cpc`/`country`/`assignee`/`after`). A dry-run budget guard rejects queries over 50 GB. When BigQuery rejects a CN CPC query (e.g., `H01L25/065` → 256 GB), the web fallback automatically searches via Firecrawl.
 
-## How It Works
-
-```
-┌──────────────┐     ┌─────────────────────────────┐
-│  AI Agent    │────▶│  patent-mcp-server          │
-│  (Claude,    │     │  (runs on YOUR machine)     │
-│   Cursor,    │     │                             │
-│   Hermes)    │     │  ┌──────────┐ ┌───────────┐ │
-│              │     │  │ Web      │ │ BigQuery  │ │
-│              │     │  │ Scraper  │ │ Client    │ │
-│              │     │  │ (free)   │ │ (optional)│ │
-│              │     │  └────┬─────┘ └─────┬─────┘ │
-│              │     │       │             │       │
-│              │     │  Google Patents   BigQuery  │
-│              │     │  Public Pages     1.4B rows │
-└──────────────┘     └─────────────────────────────┘
-```
-
-- **Web scraping for details** — fast (~1.5s), free, no credentials
-- **BigQuery for search** — 1.4B records, CN full-text, optional
-- **Smart fallback** — `get_patent` tries web first, auto-falls to BigQuery if you have it
+See [`SEARCH_GUIDE.md`](SEARCH_GUIDE.md) for best practices and [`docs/cn-cpc-correction-table.md`](docs/cn-cpc-correction-table.md) for tested CPC codes.
 
 ---
 

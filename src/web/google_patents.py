@@ -29,6 +29,10 @@ TIMEOUT = 15
 # SearXNG endpoint for web search fallback (used when BigQuery CN CPC coverage is sparse)
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8888")
 
+# Firecrawl search API — alternative backend when SearXNG engines are captcha-blocked
+FIRECRAWL_API_KEY = os.environ.get("FIRECRAWL_API_KEY", "fc-c53557ee24874f9bbce97cc538be1f09")
+FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v1/search"
+
 # Proxy for Google Patents (direct access blocked by CAPTCHA 2026-06-24)
 # Inherits HTTPS_PROXY from environment, or defaults to Clash Verge proxy
 PROXIES = {
@@ -255,6 +259,46 @@ def fetch_claims(publication_number: str) -> list[str]:
 _RELATED_CN_PATENT_RE = re.compile(r'href="/patent/(CN\d{7,14}[A-Z]?[0-9]?)/', re.IGNORECASE)
 
 
+def _firecrawl_search(query: str, limit: int = 10) -> list[dict[str, str]]:
+    """Search via Firecrawl API — bypasses SearXNG CAPTCHA blocks.
+
+    Returns list of {url, title, description} dicts.
+    Costs 2 Firecrawl credits per search.
+    """
+    try:
+        resp = requests.post(
+            FIRECRAWL_SEARCH_URL,
+            json={"query": query, "limit": limit},
+            headers={
+                "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            timeout=20,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("success"):
+            logger.warning("Firecrawl search failed: %s", data.get("error", "unknown"))
+            return []
+
+        # API returns data as either a list or {web: [...]}
+        raw = data.get("data", [])
+        items = raw if isinstance(raw, list) else raw.get("web", [])
+
+        results = []
+        for item in items:
+            results.append({
+                "url": item.get("url", ""),
+                "title": item.get("title", ""),
+                "content": item.get("description", ""),
+            })
+        logger.info("Firecrawl search %r: %d results", query[:60], len(results))
+        return results
+    except Exception as e:
+        logger.warning("Firecrawl search failed for %r: %s", query[:60], e)
+        return []
+
+
 def _discover_related_patents(
     patent_number: str,
     country: str | None = None,
@@ -385,37 +429,55 @@ def web_search_patents(
     all_results: list[dict[str, str]] = []
     seen_urls: set[str] = set()
 
-    for search_query in base_queries:
-        for page in [1, 2]:
-            try:
-                params = {
-                    "q": search_query,
-                    "format": "json",
-                    "categories": "general",
-                    "pageno": page,
-                    **search_params,
-                }
-                resp = requests.get(
-                    f"{SEARXNG_URL}/search",
-                    params=params,
-                    headers=HEADERS,
-                    timeout=20,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                page_results = data.get("results", [])
-                for r in page_results:
-                    url = r.get("url", "")
-                    if url not in seen_urls:
-                        seen_urls.add(url)
-                        all_results.append(r)
-                logger.debug("Query %r page %d: %d results", search_query[:50], page, len(page_results))
-                if not page_results:  # No more pages
-                    break
-            except Exception as e:
-                logger.warning("SearXNG search failed for %r page %d: %s", search_query[:50], page, e)
+    # For CN queries, skip SearXNG (all engines captcha-blocked or return junk)
+    # and go straight to Firecrawl which reliably finds CN patent pages.
+    if is_cn:
+        logger.info("CN query — skipping SearXNG, using Firecrawl directly")
+        fc_queries = [
+            f'{cpc_stripped} 芯片 封装 中国专利',
+            f'site:patents.google.com/patent/CN {cpc_stripped}',
+        ]
+        for fc_query in fc_queries[:2]:  # 2 queries = 4 credits
+            fc_results = _firecrawl_search(fc_query, limit=10)
+            for r in fc_results:
+                url = r.get("url", "")
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    all_results.append(r)
+            if len(all_results) >= 20:
+                break
+    else:
+        for search_query in base_queries:
+            for page in [1, 2]:
+                try:
+                    params = {
+                        "q": search_query,
+                        "format": "json",
+                        "categories": "general",
+                        "pageno": page,
+                        **search_params,
+                    }
+                    resp = requests.get(
+                        f"{SEARXNG_URL}/search",
+                        params=params,
+                        headers=HEADERS,
+                        timeout=20,
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    page_results = data.get("results", [])
+                    for r in page_results:
+                        url = r.get("url", "")
+                        if url not in seen_urls:
+                            seen_urls.add(url)
+                            all_results.append(r)
+                    logger.debug("Query %r page %d: %d results", search_query[:50], page, len(page_results))
+                    if not page_results:  # No more pages
+                        break
+                except Exception as e:
+                    logger.warning("SearXNG search failed for %r page %d: %s", search_query[:50], page, e)
 
-    logger.info("SearXNG returned %d unique results across all queries", len(all_results))
+    logger.info("Total search results: %d", len(all_results))
 
     # Extract patent numbers from search results
     seen: set[str] = set()

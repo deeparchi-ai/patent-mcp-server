@@ -143,19 +143,26 @@ def create_server(project_id: str) -> Server:
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         try:
             if name == "search_patents":
-                result = await client.search_patents(
-                    query=arguments.get("query"),
-                    assignee=arguments.get("assignee"),
-                    country=arguments.get("country"),
-                    cpc=arguments.get("cpc"),
-                    after=arguments.get("after"),
-                    before=arguments.get("before"),
-                    status=arguments.get("status"),
-                    limit=min(int(arguments.get("limit", 10)), 50),
-                )
+                try:
+                    result = await client.search_patents(
+                        query=arguments.get("query"),
+                        assignee=arguments.get("assignee"),
+                        country=arguments.get("country"),
+                        cpc=arguments.get("cpc"),
+                        after=arguments.get("after"),
+                        before=arguments.get("before"),
+                        status=arguments.get("status"),
+                        limit=min(int(arguments.get("limit", 10)), 50),
+                    )
+                except BigQueryCostError as cost_err:
+                    logger.info(
+                        "BigQuery cost blocked: %s — falling to web search",
+                        cost_err,
+                    )
+                    result = []
 
-                # Web search fallback: if BigQuery returns 0 results and CPC is set,
-                # try SearXNG web search + Google Patents enrichment.
+                # Web search fallback: if BigQuery returns 0 results (or is cost-blocked)
+                # and CPC is set, try SearXNG web search + Google Patents enrichment.
                 # This fills the gap for CN CPC queries where BigQuery's CPC
                 # classification coverage is sparse (e.g., H01L25/065 + CN).
                 if not result and arguments.get("cpc"):

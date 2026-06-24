@@ -29,9 +29,12 @@ TIMEOUT = 15
 # SearXNG endpoint for web search fallback (used when BigQuery CN CPC coverage is sparse)
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8888")
 
-# Regex to extract patent numbers from URLs and text
+# Regex to extract patent numbers from URLs and text.
+# Covers Google Patents (patent/CN123456789A), wanfang (patent/CN202310083015.8),
+# tianyancha (/da672e95...), and plain CN number patterns.
 PATENT_NUMBER_RE = re.compile(
-    r"(?:patent/|patent=)([A-Z]{2,4}[\-\s]?[0-9]{5,12}[A-Z]?[0-9]?)",
+    r"(?:patent/|patent=)([A-Z]{2,4}[\-\s]?[0-9]{5,14}[A-Z]?[0-9]?)"
+    r"|[^/\w](CN[\-\s]?[0-9]{7,13}[A-Z]?[0-9]?)",
     re.IGNORECASE,
 )
 
@@ -250,11 +253,13 @@ def web_search_patents(
 ) -> list[PatentBasic]:
     """Search patents via SearXNG web search, then enrich via Google Patents scraping.
 
-    Used as fallback when BigQuery returns zero results for CN+CPC queries where
-    BigQuery's CPC classification coverage is sparse.
+    Used as fallback when BigQuery returns zero results (or is cost-blocked) for
+    CN+CPC queries where BigQuery's CPC classification coverage is sparse.
 
-    Runs 3 parallel search queries across 2 pages each for broader coverage,
-    then deduplicates and enriches results.
+    For CN queries: uses Baidu engine via SearXNG (Google/DuckDuckGo often CAPTCHA-blocked).
+    For non-CN: uses all available SearXNG engines.
+
+    Runs 3 varied search queries across 2 pages each, then deduplicates and enriches.
 
     Args:
         cpc: CPC classification code (e.g., 'H01L25/065')
@@ -265,20 +270,41 @@ def web_search_patents(
     Returns:
         List of PatentBasic objects with details from Google Patents web scraping.
     """
-    # Build multiple search queries for broader coverage
-    cpc_quoted = f'"{cpc}"' if cpc else ""
+    is_cn = (country or "").upper() == "CN"
+
+    # Build multiple search queries — Chinese for CN, English otherwise
+    cpc_stripped = cpc.replace("/", " ") if cpc else ""
     base_queries: list[str] = []
     if cpc:
-        base_queries = [
-            f'{cpc_quoted} {country or ""} patent semiconductor'.strip(),
-            f'{cpc_quoted} {country or ""} 专利 封装 芯片'.strip(),
-            f'{cpc_quoted} {country or ""} 半导体 封装'.strip(),
-        ]
+        if is_cn:
+            base_queries = [
+                f'{cpc} CN 专利 半导体 封装',
+                f'{cpc} CN 专利 patents.google.com',
+                f'{cpc} CN 专利 wanfangdata patent',
+            ]
+        else:
+            cpc_quoted = f'"{cpc}"'
+            base_queries = [
+                f'{cpc_quoted} {country or ""} patent semiconductor'.strip(),
+                f'{cpc_quoted} {country or ""} 专利 封装 芯片'.strip(),
+                f'{cpc_quoted} {country or ""} 半导体 封装'.strip(),
+            ]
     else:
         base_queries = [f'{query or ""} {country or ""} patent'.strip()]
 
+    # Choose engine + extra params based on country
+    if is_cn:
+        search_params = {
+            "engines": "baidu",
+            "language": "zh-CN",
+        }
+    else:
+        search_params = {}
+
     logger.info(
-        "Web search fallback: cpc=%s country=%s queries=%d", cpc, country, len(base_queries)
+        "Web search fallback: cpc=%s country=%s queries=%d engine=%s",
+        cpc, country, len(base_queries),
+        search_params.get("engines", "all"),
     )
 
     # Collect all results across queries and pages
@@ -288,17 +314,18 @@ def web_search_patents(
     for search_query in base_queries:
         for page in [1, 2]:
             try:
+                params = {
+                    "q": search_query,
+                    "format": "json",
+                    "categories": "general",
+                    "pageno": page,
+                    **search_params,
+                }
                 resp = requests.get(
                     f"{SEARXNG_URL}/search",
-                    params={
-                        "q": search_query,
-                        "format": "json",
-                        "categories": "general",
-                        "pageno": page,
-                    },
+                    params=params,
                     headers=HEADERS,
                     timeout=20,
-                    proxies={"http": "", "https": ""},
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -308,11 +335,11 @@ def web_search_patents(
                     if url not in seen_urls:
                         seen_urls.add(url)
                         all_results.append(r)
-                logger.debug("Query %r page %d: %d results", search_query[:40], page, len(page_results))
+                logger.debug("Query %r page %d: %d results", search_query[:50], page, len(page_results))
                 if not page_results:  # No more pages
                     break
             except Exception as e:
-                logger.warning("SearXNG search failed for %r page %d: %s", search_query[:40], page, e)
+                logger.warning("SearXNG search failed for %r page %d: %s", search_query[:50], page, e)
 
     logger.info("SearXNG returned %d unique results across all queries", len(all_results))
 

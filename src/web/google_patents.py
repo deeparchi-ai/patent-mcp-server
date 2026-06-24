@@ -337,18 +337,28 @@ def web_search_patents(
     """
     is_cn = (country or "").upper() == "CN"
 
-    # Build multiple search queries — Chinese for CN, English otherwise
+    # Choose engine based on what's working (Google/DuckDuckGo/Startpage all captcha-blocked)
+    if is_cn:
+        search_params = {
+            "engines": "baidu",
+            "language": "zh-CN",
+        }
+    else:
+        search_params = {
+            "engines": "bing",
+        }
+
+    # Build multiple search queries
     cpc_stripped = cpc.replace("/", " ") if cpc else ""
     cpc_quoted = f'"{cpc}"' if cpc else ""
     base_queries: list[str] = []
     if cpc:
         if is_cn:
-            # DuckDuckGo needs quoted CPC to avoid / being treated as separator
+            # Baidu engine: use Chinese patent search terms
             base_queries = [
-                f'{cpc_quoted} CN patent semiconductor',
-                f'{cpc_quoted} CN 专利 半导体 封装',
-                f'{cpc_quoted} CN patents.google.com',
-                f'{cpc} CN 专利 wanfangdata',
+                f'{cpc} CN 专利 半导体 封装',
+                f'{cpc} CN 专利 patents.google.com',
+                f'{cpc} CN 专利 wanfangdata patent',
             ]
         else:
             cpc_quoted = f'"{cpc}"'
@@ -359,18 +369,6 @@ def web_search_patents(
             ]
     else:
         base_queries = [f'{query or ""} {country or ""} patent'.strip()]
-
-    # Choose engine + extra params based on country
-    # DuckDuckGo is most reliable through SearXNG (Google/Baidu often CAPTCHA-blocked)
-    if is_cn:
-        search_params = {
-            "engines": "duckduckgo",
-            "language": "zh-CN",
-        }
-    else:
-        search_params = {
-            "engines": "duckduckgo",
-        }
 
     logger.info(
         "Web search fallback: cpc=%s country=%s queries=%d engine=%s",

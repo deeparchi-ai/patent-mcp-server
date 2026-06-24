@@ -17,10 +17,15 @@ class TestBigQueryClientInit:
 
 class TestSearchPatentsValidation:
     def test_rejects_bare_keyword_without_filters(self) -> None:
-        """Must require at least one of country/cpc/after."""
-        client = BigQueryClient(project_id="test")
-        with pytest.raises(ValueError, match="at least one filter"):
-            client.search_patents_sql("artificial intelligence")
+        """Keyword-only search now gets a default 'after' partition filter (v1.6.0).
+        The validation only fires if no filter at all is provided — but 'after'
+        is now always defaulted, so bare keyword is no longer rejected."""
+        sql, params = BigQueryClient(project_id="test").search_patents_sql(
+            "artificial intelligence"
+        )
+        # With default after="2005-01-01", query should succeed with partition pruning
+        assert "filing_date" in sql
+        assert "@after" in sql
 
     def test_accepts_keyword_with_country(self) -> None:
         sql, params = BigQueryClient(project_id="test").search_patents_sql(
@@ -44,8 +49,9 @@ class TestSearchPatentsValidation:
         assert "REGEXP_CONTAINS" in sql
         assert "assignee_harmonized" in sql
         assert "LIMIT" in sql
-        # Verify (^| )word( |$) boundary regex in parameter (lowercased)
-        assert params[-1].value == "(^| )boe( |$)"
+        # Find the assignee param by value (order may vary due to default 'after')
+        assignee_params = [p for p in params if p.value == "(^| )boe( |$)"]
+        assert len(assignee_params) == 1
 
     def test_assignee_no_longer_matches_substring(self) -> None:
         """Space-anchored regex: BOE should NOT match BOEING."""

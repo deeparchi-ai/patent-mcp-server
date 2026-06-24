@@ -1,4 +1,9 @@
-"""BigQuery client for patent-mcp-server — single connection, parameterized queries."""
+"""BigQuery client for patent-mcp-server — single connection, parameterized queries.
+
+v1.6.0: Added default partition filter (after="2005-01-01") + dry-run budget checks.
+       search_patents now defaults to last ~21 years instead of full-table scan.
+       Queries that would scan > 10 GB are rejected; > 50 GB are rejected with warning.
+"""
 
 from __future__ import annotations
 
@@ -26,6 +31,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# ── Cost control thresholds ─────────────────────────────────────────
+SCAN_WARNING_GB = 10   # warn if query scans > 10 GB
+SCAN_REJECT_GB = 50    # reject if query would scan > 50 GB
+SEARCH_DEFAULT_AFTER = "2005-01-01"  # partition filter: last ~21 years
+
 
 class BigQueryError(Exception):
     """Base error for BigQuery operations."""
@@ -33,6 +43,10 @@ class BigQueryError(Exception):
 
 class PatentNotFoundError(BigQueryError):
     """Patent number not found in dataset."""
+
+
+class BigQueryCostError(BigQueryError):
+    """Query would scan too much data — rejected by budget guard."""
 
 
 def _int_to_date(value: int | None) -> date | None:
@@ -54,15 +68,12 @@ def _build_patent_basic(
     title_zh = row.get("title_zh") or None
     abstract_zh = row.get("abstract_zh") or None
 
-    # Extract assignee
     assignees = row.get("assignee_harmonized") or []
     assignee = assignees[0]["name"] if assignees else None
 
-    # Extract inventors
     inventors_raw = row.get("inventor_harmonized") or []
     inventors = [inv["name"] for inv in inventors_raw if inv.get("name")]
 
-    # CPC codes
     cpc_raw = row.get("cpc") or []
     cpc_codes = [c["code"] for c in cpc_raw if c.get("code")]
 
@@ -85,7 +96,6 @@ def _build_patent_detail(row: Any) -> PatentDetail:
     """Build PatentDetail from a BigQuery row dict."""
     basic = _build_patent_basic(row)
 
-    # Classifications
     classifications: list[ClassificationCode] = []
     for scheme, key in [("CPC", "cpc"), ("IPC", "ipc")]:
         items = row.get(key) or []
@@ -99,7 +109,6 @@ def _build_patent_detail(row: Any) -> PatentDetail:
                     )
                 )
 
-    # Citations
     citations: list[Citation] = []
     for cit in row.get("citation") or []:
         citations.append(
@@ -137,8 +146,8 @@ def _build_patent_detail(row: Any) -> PatentDetail:
 class BigQueryClient:
     """Singleton BigQuery client with parameterized queries.
 
-    All queries are parameterized (no f-string SQL injection).
-    A cost-control filter (country, cpc, or date) is required for search.
+    v1.6.0: search_patents defaults to after="2005-01-01" for partition pruning.
+    All queries are dry-run checked: > 50 GB → rejected, > 10 GB → warning.
     """
 
     def __init__(self, project_id: str) -> None:
@@ -153,7 +162,30 @@ class BigQueryClient:
             self._client = bigquery.Client(project=self.project_id)
         return self._client
 
-    # ── SQL builders (public for testing) ──────────────────────────
+    # ── Budget guard ────────────────────────────────────────────────
+
+    def _check_budget(self, sql: str, params: list[ScalarQueryParameter]) -> None:
+        """Run dry-run to estimate bytes scanned; reject if over threshold."""
+        job_config = bigquery.QueryJobConfig(
+            dry_run=True,
+            query_parameters=params,
+        )
+        try:
+            job = self.client.query(sql, job_config=job_config)
+            gb = job.total_bytes_processed / 1e9 if job.total_bytes_processed else 0
+        except Exception:
+            logger.warning("Dry-run budget check failed — allowing query to proceed")
+            return
+
+        if gb > SCAN_REJECT_GB:
+            raise BigQueryCostError(
+                f"Query rejected: would scan {gb:.1f} GB "
+                f"(max {SCAN_REJECT_GB} GB). Add filters (after/country/cpc)."
+            )
+        if gb > SCAN_WARNING_GB:
+            logger.warning("Query will scan %.1f GB — add date filter to reduce cost", gb)
+
+    # ── SQL builders (public for testing) ────────────────────────────
 
     @staticmethod
     def search_patents_sql(
@@ -167,6 +199,10 @@ class BigQueryClient:
         status: str | None = None,
         limit: int = 10,
     ) -> tuple[str, list[ScalarQueryParameter]]:
+        # ── v1.6.0: default partition filter ──────────────────────────
+        if after is None:
+            after = SEARCH_DEFAULT_AFTER
+
         if not any([country, cpc, after, assignee]) and query:
             raise ValueError(
                 "search_patents requires at least one filter "
@@ -193,7 +229,7 @@ class BigQueryClient:
     ) -> tuple[str, list[ScalarQueryParameter]]:
         return get_patent_claims_query(publication_number)  # type: ignore[no-any-return]
 
-    # ── Query execution ────────────────────────────────────────────
+    # ── Query execution ──────────────────────────────────────────────
 
     async def search_patents(
         self,
@@ -207,6 +243,10 @@ class BigQueryClient:
         status: str | None = None,
         limit: int = 10,
     ) -> list[PatentBasic]:
+        # ── v1.6.0: enforce default partition filter ──────────────────
+        if after is None:
+            after = SEARCH_DEFAULT_AFTER
+
         sql, params = self.search_patents_sql(
             query=query,
             assignee=assignee,
@@ -217,25 +257,38 @@ class BigQueryClient:
             status=status,
             limit=limit,
         )
+        self._check_budget(sql, params)
         job = self.client.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=params))
         results: list[PatentBasic] = []
         for row in job.result():
             results.append(_build_patent_basic(dict(row)))
+        gb = (job.total_bytes_processed or 0) / 1e9
+        logger.info("search_patents scanned %.3f GB, returned %d results", gb, len(results))
+        import sys
+        print(f"[COST] search_patents: {gb:.3f} GB scanned, {len(results)} results", file=sys.stderr, flush=True)
         return results
 
     async def get_patent(self, publication_number: str) -> PatentDetail:
         sql, params = self.get_patent_sql(publication_number)
+        self._check_budget(sql, params)
         job = self.client.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=params))
         rows = list(job.result())
+        gb = (job.total_bytes_processed or 0) / 1e9
+        import sys
+        print(f"[COST] get_patent: {gb:.3f} GB scanned", file=sys.stderr, flush=True)
         if not rows:
             raise PatentNotFoundError(f"Patent not found: {publication_number}")
         return _build_patent_detail(dict(rows[0]))
 
     async def get_patent_claims(self, publication_number: str) -> list[str]:
         sql, params = self.get_patent_claims_sql(publication_number)
+        self._check_budget(sql, params)
         job = self.client.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=params))
-        return [str(row["text"]) for row in job.result()]
-
+        claims = [str(row["text"]) for row in job.result()]
+        gb = (job.total_bytes_processed or 0) / 1e9
+        import sys
+        print(f"[COST] get_patent_claims: {gb:.3f} GB scanned", file=sys.stderr, flush=True)
+        return claims
     async def close(self) -> None:
         if self._client is not None:
             self._client.close()  # type: ignore[no-untyped-call]

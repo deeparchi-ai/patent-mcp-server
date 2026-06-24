@@ -22,7 +22,7 @@ from mcp.types import (
     Tool,
 )
 
-from bigquery.client import BigQueryClient, BigQueryError, PatentNotFoundError
+from bigquery.client import BigQueryClient, BigQueryCostError, BigQueryError, PatentNotFoundError
 from web.google_patents import fetch_claims as web_fetch_claims
 from web.google_patents import fetch_patent as web_fetch_patent
 
@@ -235,6 +235,13 @@ def create_server(project_id: str) -> Server:
                 TextContent(
                     type="text",
                     text=json.dumps({"error": "not_found", "message": str(e)}),
+                )
+            ]
+        except BigQueryCostError as e:
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"error": "cost_limit", "message": str(e)}),
                 )
             ]
         except BigQueryError as e:

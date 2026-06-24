@@ -1,4 +1,5 @@
 """Google Patents web scraper — zero-cost alternative to BigQuery for single patent lookups.
+Also includes web search fallback via SearXNG for CN CPC queries where BigQuery coverage is sparse.
 
 Uses server-rendered HTML (no JS needed) with Dublin Core meta tags.
 """
@@ -6,6 +7,7 @@ Uses server-rendered HTML (no JS needed) with Dublin Core meta tags.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from datetime import date
 from html.parser import HTMLParser
@@ -13,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import requests
 
-from models.patent import Citation, ClassificationCode, PatentDetail
+from models.patent import Citation, ClassificationCode, PatentBasic, PatentDetail
 
 if TYPE_CHECKING:
     pass
@@ -23,6 +25,30 @@ logger = logging.getLogger(__name__)
 GOOGLE_PATENTS_URL = "https://patents.google.com/patent/{pub}/en"
 HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
 TIMEOUT = 15
+
+# SearXNG endpoint for web search fallback (used when BigQuery CN CPC coverage is sparse)
+SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8888")
+
+# Regex to extract patent numbers from URLs and text
+PATENT_NUMBER_RE = re.compile(
+    r"(?:patent/|patent=)([A-Z]{2,4}[\-\s]?[0-9]{5,12}[A-Z]?[0-9]?)",
+    re.IGNORECASE,
+)
+
+# Normalize patent number to DOCDB format: US7650331B2 → US-7650331-B2
+_PATENT_PARTS_RE = re.compile(r"^([A-Z]{2,4})([0-9]{5,12})([A-Z][0-9]?)?$")
+
+
+def _normalize_patent_number(raw: str) -> str:
+    """Normalize a patent number string to DOCDB format (US-7650331-B2)."""
+    clean = raw.replace(" ", "").replace("-", "").upper()
+    m = _PATENT_PARTS_RE.match(clean)
+    if not m:
+        return raw
+    country, number, kind = m.groups()
+    if kind:
+        return f"{country}-{number}-{kind}"
+    return f"{country}-{number}"
 
 
 class _MetaParser(HTMLParser):
@@ -214,3 +240,148 @@ def fetch_claims(publication_number: str) -> list[str]:
     parser = _ClaimParser()
     parser.feed(resp.text)
     return parser.claims
+
+
+def web_search_patents(
+    cpc: str | None = None,
+    query: str | None = None,
+    country: str | None = None,
+    limit: int = 10,
+) -> list[PatentBasic]:
+    """Search patents via SearXNG web search, then enrich via Google Patents scraping.
+
+    Used as fallback when BigQuery returns zero results for CN+CPC queries where
+    BigQuery's CPC classification coverage is sparse.
+
+    Args:
+        cpc: CPC classification code (e.g., 'H01L25/065')
+        query: Additional keyword query
+        country: Country code filter (e.g., 'CN')
+        limit: Maximum results to return
+
+    Returns:
+        List of PatentBasic objects with details from Google Patents web scraping.
+    """
+    # Build search query
+    search_parts: list[str] = []
+    if cpc:
+        search_parts.append(f'"{cpc}"')
+    if country:
+        search_parts.append(country)
+    if query:
+        search_parts.append(query)
+    search_parts.append("patent")
+
+    search_query = " ".join(search_parts)
+    logger.info(
+        "Web search fallback: query=%r cpc=%s country=%s", search_query, cpc, country
+    )
+
+    # Search via SearXNG
+    try:
+        resp = requests.get(
+            f"{SEARXNG_URL}/search",
+            params={"q": search_query, "format": "json", "categories": "general"},
+            headers=HEADERS,
+            timeout=TIMEOUT,
+            proxies={"http": "", "https": ""},  # bypass proxy for local SearXNG
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        logger.warning("SearXNG search failed: %s", e)
+        return []
+
+    results = data.get("results", [])
+    logger.info("SearXNG returned %d raw results", len(results))
+
+    # Extract patent numbers from search results
+    seen: set[str] = set()
+    patent_numbers: list[str] = []
+
+    # First pass: extract from patents.google.com URLs
+    for r in results:
+        url = r.get("url", "")
+        m = PATENT_NUMBER_RE.search(url)
+        if m:
+            pn = _normalize_patent_number(m.group(1))
+            if pn not in seen:
+                if country and not pn.upper().startswith(country.upper()):
+                    continue
+                seen.add(pn)
+                patent_numbers.append(pn)
+
+    # Second pass: extract from any text if we need more
+    if len(patent_numbers) < limit:
+        for r in results:
+            text = r.get("title", "") + " " + r.get("content", "")
+            for m in PATENT_NUMBER_RE.finditer(text):
+                pn = _normalize_patent_number(m.group(1))
+                if pn not in seen:
+                    if country and not pn.upper().startswith(country.upper()):
+                        continue
+                    seen.add(pn)
+                    patent_numbers.append(pn)
+                    if len(patent_numbers) >= limit:
+                        break
+            if len(patent_numbers) >= limit:
+                break
+
+    logger.info(
+        "Extracted %d patent numbers (filtered to %s): %s",
+        len(patent_numbers),
+        country or "any",
+        patent_numbers[:5],
+    )
+
+    # Build lookup: patent number → search result metadata (for fallback)
+    pn_meta: dict[str, dict[str, str]] = {}
+    for r in results:
+        url = r.get("url", "")
+        m = PATENT_NUMBER_RE.search(url)
+        if m:
+            pn = _normalize_patent_number(m.group(1))
+            if pn not in pn_meta:
+                pn_meta[pn] = {
+                    "title": r.get("title", ""),
+                    "snippet": r.get("content", "")[:500],
+                    "url": url,
+                }
+
+    # Enrich each patent via web scraping
+    # Falls back to SearXNG metadata when Google Patents fetch fails
+    enriched: list[PatentBasic] = []
+    for pn in patent_numbers[:limit]:
+        try:
+            detail = fetch_patent(pn)
+            enriched.append(
+                PatentBasic(
+                    publication_number=detail.publication_number,
+                    title=detail.title,
+                    abstract=detail.abstract,
+                    country_code=detail.country_code,
+                    zh_title=detail.zh_title,
+                    zh_abstract=detail.zh_abstract,
+                    filing_date=detail.filing_date,
+                    grant_date=detail.grant_date,
+                    assignee=detail.assignee,
+                    inventors=detail.inventors,
+                    cpc_codes=detail.cpc_codes,
+                )
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch details for %s: %s — using search metadata", pn, e
+            )
+            meta = pn_meta.get(pn, {})
+            enriched.append(
+                PatentBasic(
+                    publication_number=pn,
+                    title=meta.get("title", pn),
+                    abstract=meta.get("snippet", ""),
+                    country_code=pn[:2],
+                )
+            )
+
+    logger.info("Web search enriched %d patents", len(enriched))
+    return enriched

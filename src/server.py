@@ -25,6 +25,7 @@ from mcp.types import (
 from bigquery.client import BigQueryClient, BigQueryCostError, BigQueryError, PatentNotFoundError
 from web.google_patents import fetch_claims as web_fetch_claims
 from web.google_patents import fetch_patent as web_fetch_patent
+from web.google_patents import web_search_patents
 
 logger = logging.getLogger("patent-mcp-server")
 
@@ -152,6 +153,32 @@ def create_server(project_id: str) -> Server:
                     status=arguments.get("status"),
                     limit=min(int(arguments.get("limit", 10)), 50),
                 )
+
+                # Web search fallback: if BigQuery returns 0 results and CPC is set,
+                # try SearXNG web search + Google Patents enrichment.
+                # This fills the gap for CN CPC queries where BigQuery's CPC
+                # classification coverage is sparse (e.g., H01L25/065 + CN).
+                if not result and arguments.get("cpc"):
+                    country_val = str(arguments.get("country", ""))
+                    if country_val == "CN" or not country_val:
+                        logger.info(
+                            "BigQuery returned 0 for cpc=%s country=%s — web fallback",
+                            arguments["cpc"],
+                            country_val,
+                        )
+                        web_results = await asyncio.to_thread(
+                            web_search_patents,
+                            cpc=str(arguments["cpc"]),
+                            query=arguments.get("query"),
+                            country=arguments.get("country"),
+                            limit=min(int(arguments.get("limit", 10)), 50),
+                        )
+                        if web_results:
+                            result = web_results
+                            logger.info(
+                                "Web fallback returned %d results", len(result)
+                            )
+
                 data = [r.model_dump(mode="json") for r in result]
                 return [
                     TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))

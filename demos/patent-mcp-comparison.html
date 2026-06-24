@@ -108,13 +108,32 @@
   .dot.r { background: var(--red); } .dot.a { background: var(--amber); } .dot.y { background: #FFCC02; } .dot.g { background: var(--green); }
 
   .aha { max-width: 1000px; margin: 0 auto 80px; padding: 0 24px; text-align: center; }
-  .aha h2 { font-size: 26px; font-weight: 700; margin-bottom: 24px; letter-spacing: -0.3px; }
-  .aha-box { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; text-align: center; }
+  .aha h2 { font-size: 26px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.3px; }
+  .aha .subtitle { font-size: 15px; color: var(--text-secondary); margin-bottom: 28px; }
+  .aha-box { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
   @media (max-width: 800px) { .aha-box { grid-template-columns: 1fr 1fr; } }
-  .aha-item { background: var(--card-bg); border-radius: 14px; padding: 20px 16px; }
-  .aha-item .emoji { font-size: 30px; margin-bottom: 10px; }
-  .aha-item .title { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
-  .aha-item .desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .aha-item {
+    padding: 28px 18px 24px; text-align: center; position: relative;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .aha-item.aha-red    { background: linear-gradient(180deg, #FEF2F2 0%, #FEE2E2 100%); }
+  .aha-item.aha-amber  { background: linear-gradient(180deg, #FFF7ED 0%, #FFEDD5 100%); }
+  .aha-item.aha-yellow { background: linear-gradient(180deg, #FFFDE7 0%, #FFF9C4 100%); }
+  .aha-item.aha-green  { background: linear-gradient(180deg, #F0FDF4 0%, #DCFCE7 100%); }
+  .aha-item .tag {
+    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+    padding: 3px 10px; border-radius: 20px;
+  }
+  .aha-red .tag    { background: #FCA5A5; color: #991B1B; }
+  .aha-amber .tag  { background: #FDBA74; color: #9A3412; }
+  .aha-yellow .tag { background: #FDE047; color: #713F12; }
+  .aha-green .tag  { background: #86EFAC; color: #166534; }
+  .aha-item .big { font-size: 26px; font-weight: 800; line-height: 1.2; letter-spacing: -0.3px; }
+  .aha-red .big    { color: #991B1B; }
+  .aha-amber .big  { color: #9A3412; }
+  .aha-yellow .big { color: #713F12; }
+  .aha-green .big  { color: #166534; }
+  .aha-item .desc { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
 
   .cta { text-align: center; padding: 0 24px 100px; max-width: 600px; margin: 0 auto; }
   .cta h3 { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
@@ -277,22 +296,27 @@
 <!-- Aha -->
 <div class="aha">
   <h2>Not "finding more" — finding <em>verifiably correct</em> data</h2>
+  <p class="subtitle">The same query. The same goal. Four tools. One returns ground truth.</p>
   <div class="aha-box">
-    <div class="aha-item">
-      <div class="emoji">🌐</div><div class="title">Web Search</div>
-      <div class="desc">Returns links.<br>Agent must crawl, parse, extract.<br>Zero structure.</div>
+    <div class="aha-item aha-red">
+      <span class="tag">Useless</span>
+      <div class="big">Zero patents.<br>Ten blue links.</div>
+      <div class="desc">Agent must crawl 10 pages, each with different formats. High failure rate. Zero structure.</div>
     </div>
-    <div class="aha-item">
-      <div class="emoji">🤖</div><div class="title">LLM Chatbot</div>
-      <div class="desc">Plausible-sounding fiction.<br>Patent numbers fabricated.<br>Dates impossible.</div>
+    <div class="aha-item aha-amber">
+      <span class="tag">Hallucinated</span>
+      <div class="big">Sounds real.<br>Isn't.</div>
+      <div class="desc">Patent numbers fabricated. Dates impossible. Agent builds analysis on fiction with no way to verify.</div>
     </div>
-    <div class="aha-item">
-      <div class="emoji">🔎</div><div class="title">Search + LLM</div>
-      <div class="desc">Real patents!<br>But metadata is wrong.<br>Web can't verify CPC.</div>
+    <div class="aha-item aha-yellow">
+      <span class="tag">Real but wrong</span>
+      <div class="big">Patents are real.<br>Metadata isn't.</div>
+      <div class="desc">Web search found real patent numbers. But CPC codes, classifications — all misattributed. Close is not correct.</div>
     </div>
-    <div class="aha-item">
-      <div class="emoji">📊</div><div class="title">Patent MCP</div>
-      <div class="desc">Every field is database-verified.<br>CPC, assignee, dates — all real.<br>Agent consumes directly.</div>
+    <div class="aha-item aha-green">
+      <span class="tag">Ground truth</span>
+      <div class="big">Every field<br>verified.</div>
+      <div class="desc">Database-backed. CPC real. Assignees real. Dates real. Agent consumes structured JSON directly — zero loss.</div>
     </div>
   </div>
 </div>

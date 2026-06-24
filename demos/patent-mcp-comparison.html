@@ -108,32 +108,63 @@
   .dot.r { background: var(--red); } .dot.a { background: var(--amber); } .dot.y { background: #FFCC02; } .dot.g { background: var(--green); }
 
   .aha { max-width: 1000px; margin: 0 auto 80px; padding: 0 24px; text-align: center; }
-  .aha h2 { font-size: 26px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.3px; }
-  .aha .subtitle { font-size: 15px; color: var(--text-secondary); margin-bottom: 28px; }
-  .aha-box { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
-  @media (max-width: 800px) { .aha-box { grid-template-columns: 1fr 1fr; } }
-  .aha-item {
-    padding: 28px 18px 24px; text-align: center; position: relative;
-    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  .aha h2 { font-size: 26px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.3px; }
+  .aha .subtitle { font-size: 15px; color: var(--text-secondary); margin-bottom: 32px; }
+  .aha-flow { display: flex; align-items: stretch; gap: 0; }
+  @media (max-width: 800px) { .aha-flow { flex-direction: column; } }
+  .aha-step {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 14px; text-align: center; position: relative; flex: 1;
+    border: 2px solid var(--border); transition: all 0.2s;
   }
-  .aha-item.aha-red    { background: linear-gradient(180deg, #FEF2F2 0%, #FEE2E2 100%); }
-  .aha-item.aha-amber  { background: linear-gradient(180deg, #FFF7ED 0%, #FFEDD5 100%); }
-  .aha-item.aha-yellow { background: linear-gradient(180deg, #FFFDE7 0%, #FFF9C4 100%); }
-  .aha-item.aha-green  { background: linear-gradient(180deg, #F0FDF4 0%, #DCFCE7 100%); }
-  .aha-item .tag {
-    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
-    padding: 3px 10px; border-radius: 20px;
+  .aha-step:first-child { border-radius: 14px 0 0 14px; }
+  .aha-step:last-child  { border-radius: 0 14px 14px 0; }
+  .aha-step:not(:last-child) { border-right: none; }
+  @media (max-width: 800px) {
+    .aha-step:first-child { border-radius: 14px 14px 0 0; }
+    .aha-step:last-child  { border-radius: 0 0 14px 14px; }
+    .aha-step:not(:last-child) { border-right: 2px solid var(--border); border-bottom: none; }
   }
-  .aha-red .tag    { background: #FCA5A5; color: #991B1B; }
-  .aha-amber .tag  { background: #FDBA74; color: #9A3412; }
-  .aha-yellow .tag { background: #FDE047; color: #713F12; }
-  .aha-green .tag  { background: #86EFAC; color: #166534; }
-  .aha-item .big { font-size: 26px; font-weight: 800; line-height: 1.2; letter-spacing: -0.3px; }
-  .aha-red .big    { color: #991B1B; }
-  .aha-amber .big  { color: #9A3412; }
-  .aha-yellow .big { color: #713F12; }
-  .aha-green .big  { color: #166534; }
-  .aha-item .desc { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+  /* Step sizes — progressive emphasis */
+  .aha-step.s1 { flex: 0.8;  background: #FEF2F2; }
+  .aha-step.s2 { flex: 0.9;  background: #FFF7ED; }
+  .aha-step.s3 { flex: 1.0;  background: #FFFDE7; }
+  .aha-step.s4 {
+    flex: 1.5; background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%);
+    border: 3px solid var(--green); box-shadow: 0 4px 24px rgba(52,199,89,0.15);
+    z-index: 1;
+  }
+  .aha-step .num {
+    width: 32px; height: 32px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 14px; font-weight: 800;
+    margin-bottom: 12px;
+  }
+  .s1 .num { background: #FCA5A5; color: #7F1D1D; }
+  .s2 .num { background: #FDBA74; color: #7C2D12; }
+  .s3 .num { background: #FDE047; color: #713F12; }
+  .s4 .num { background: var(--green); color: white; }
+  .aha-step .label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+  .s1 .label { color: #991B1B; } .s2 .label { color: #9A3412; }
+  .s3 .label { color: #8D6E00; } .s4 .label { color: #166534; }
+  .aha-step .punch {
+    font-size: 17px; font-weight: 800; line-height: 1.3; letter-spacing: -0.2px;
+    margin-bottom: 6px;
+  }
+  .s1 .punch, .s2 .punch, .s3 .punch { color: var(--text); }
+  .s4 .punch { color: #14532D; font-size: 20px; }
+  .aha-step .why {
+    font-size: 11px; color: var(--text-secondary); line-height: 1.5;
+  }
+  .s4 .why { color: #166534; font-weight: 500; }
+  /* Arrow between steps */
+  .aha-arrow {
+    display: flex; align-items: center; justify-content: center; width: 28px;
+    flex-shrink: 0; color: var(--text-secondary); font-size: 16px; font-weight: 300;
+  }
+  @media (max-width: 800px) { .aha-arrow { width: 100%; height: 24px; transform: rotate(90deg); } }
 
   .cta { text-align: center; padding: 0 24px 100px; max-width: 600px; margin: 0 auto; }
   .cta h3 { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
@@ -296,27 +327,34 @@
 <!-- Aha -->
 <div class="aha">
   <h2>Not "finding more" — finding <em>verifiably correct</em> data</h2>
-  <p class="subtitle">The same query. The same goal. Four tools. One returns ground truth.</p>
-  <div class="aha-box">
-    <div class="aha-item aha-red">
-      <span class="tag">Useless</span>
-      <div class="big">Zero patents.<br>Ten blue links.</div>
-      <div class="desc">Agent must crawl 10 pages, each with different formats. High failure rate. Zero structure.</div>
+  <p class="subtitle">The same query. Four tools. One path to ground truth.</p>
+  <div class="aha-flow">
+    <div class="aha-step s1">
+      <div class="num">1</div>
+      <div class="label">Web Search</div>
+      <div class="punch">Ten blue links.<br>Zero patents.</div>
+      <div class="why">Agent must crawl 10 pages with different formats. High failure rate. No structure.</div>
     </div>
-    <div class="aha-item aha-amber">
-      <span class="tag">Hallucinated</span>
-      <div class="big">Sounds real.<br>Isn't.</div>
-      <div class="desc">Patent numbers fabricated. Dates impossible. Agent builds analysis on fiction with no way to verify.</div>
+    <div class="aha-arrow">→</div>
+    <div class="aha-step s2">
+      <div class="num">2</div>
+      <div class="label">LLM Chatbot</div>
+      <div class="punch">Sounds real.<br>Isn't.</div>
+      <div class="why">Patent numbers fabricated. Dates impossible. Agent builds analysis on fiction.</div>
     </div>
-    <div class="aha-item aha-yellow">
-      <span class="tag">Real but wrong</span>
-      <div class="big">Patents are real.<br>Metadata isn't.</div>
-      <div class="desc">Web search found real patent numbers. But CPC codes, classifications — all misattributed. Close is not correct.</div>
+    <div class="aha-arrow">→</div>
+    <div class="aha-step s3">
+      <div class="num">3</div>
+      <div class="label">Search + LLM</div>
+      <div class="punch">Real patents.<br>Wrong metadata.</div>
+      <div class="why">Web found real numbers. But CPC codes are all misattributed. Close ≠ correct.</div>
     </div>
-    <div class="aha-item aha-green">
-      <span class="tag">Ground truth</span>
-      <div class="big">Every field<br>verified.</div>
-      <div class="desc">Database-backed. CPC real. Assignees real. Dates real. Agent consumes structured JSON directly — zero loss.</div>
+    <div class="aha-arrow">→</div>
+    <div class="aha-step s4">
+      <div class="num">4</div>
+      <div class="label">Patent MCP</div>
+      <div class="punch">Every field verified.<br>Ground truth.</div>
+      <div class="why">Database-backed. CPC, assignees, dates — all real. Agent consumes structured JSON directly. Zero loss.</div>
     </div>
   </div>
 </div>

@@ -245,6 +245,61 @@ def fetch_claims(publication_number: str) -> list[str]:
     return parser.claims
 
 
+# Regex to extract CN patent links from Google Patents HTML (href="/patent/CN123456A/")
+_RELATED_CN_PATENT_RE = re.compile(r'href="/patent/(CN\d{7,14}[A-Z]?[0-9]?)/', re.IGNORECASE)
+
+
+def _discover_related_patents(
+    patent_number: str,
+    country: str | None = None,
+    limit: int = 20,
+) -> list[str]:
+    """Scrape a Google Patents page for related/cited patent links.
+
+    Google Patents individual pages (server-rendered HTML) contain links to similar,
+    cited, and citing patents. This extracts CN patent numbers from those links.
+
+    Args:
+        patent_number: A patent number known to be in the target CPC class.
+        country: Optional country filter (e.g., 'CN').
+        limit: Maximum related patent numbers to return.
+
+    Returns:
+        List of normalized CN patent numbers (DOCDB format).
+    """
+    try:
+        url = GOOGLE_PATENTS_URL.format(pub=patent_number)
+        resp = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=TIMEOUT,
+        )
+        resp.raise_for_status()
+
+        matches = _RELATED_CN_PATENT_RE.findall(resp.text)
+        seen: set[str] = set()
+        result: list[str] = []
+        for raw in matches:
+            pn = _normalize_patent_number(raw)
+            if pn in seen:
+                continue
+            if country and not pn.upper().startswith(country.upper()):
+                continue
+            seen.add(pn)
+            result.append(pn)
+            if len(result) >= limit:
+                break
+
+        logger.debug(
+            "Discovered %d related CN patents from %s (out of %d links)",
+            len(result), patent_number, len(matches),
+        )
+        return result
+    except Exception as e:
+        logger.warning("Failed to discover related patents from %s: %s", patent_number, e)
+        return []
+
+
 def web_search_patents(
     cpc: str | None = None,
     query: str | None = None,
@@ -256,10 +311,13 @@ def web_search_patents(
     Used as fallback when BigQuery returns zero results (or is cost-blocked) for
     CN+CPC queries where BigQuery's CPC classification coverage is sparse.
 
-    For CN queries: uses Baidu engine via SearXNG (Google/DuckDuckGo often CAPTCHA-blocked).
-    For non-CN: uses all available SearXNG engines.
+    Two-phase discovery:
+      1. SearXNG web search for initial patent numbers
+      2. Google Patents "related patent" crawling for expansion (CN only)
 
-    Runs 3 varied search queries across 2 pages each, then deduplicates and enriches.
+    Runs 3–4 varied search queries across 2 pages each, deduplicates,
+    discovers related patents from Google Patents pages, then enriches
+    all results via Google Patents web scraping.
 
     Args:
         cpc: CPC classification code (e.g., 'H01L25/065')
@@ -293,13 +351,16 @@ def web_search_patents(
         base_queries = [f'{query or ""} {country or ""} patent'.strip()]
 
     # Choose engine + extra params based on country
+    # DuckDuckGo is most reliable through SearXNG (Google/Baidu often CAPTCHA-blocked)
     if is_cn:
         search_params = {
-            "engines": "baidu",
+            "engines": "duckduckgo",
             "language": "zh-CN",
         }
     else:
-        search_params = {}
+        search_params = {
+            "engines": "duckduckgo",
+        }
 
     logger.info(
         "Web search fallback: cpc=%s country=%s queries=%d engine=%s",
@@ -383,6 +444,23 @@ def web_search_patents(
         country or "any",
         patent_numbers[:5],
     )
+
+    # Phase 2: Discover related patents from Google Patents pages
+    # Scrapes "similar/cited/citing" patent links to expand coverage
+    if is_cn and len(patent_numbers) < limit:
+        expansion_seeds = list(patent_numbers)  # copy before modification
+        for seed in expansion_seeds[:5]:  # limit to 5 seeds to avoid too many requests
+            related = _discover_related_patents(seed, country=country, limit=limit)
+            for pn in related:
+                if pn not in seen:
+                    seen.add(pn)
+                    patent_numbers.append(pn)
+            if len(patent_numbers) >= limit:
+                break
+        logger.info(
+            "After related-patent expansion: %d total patent numbers",
+            len(patent_numbers),
+        )
 
     # Build lookup: patent number → search result metadata (for fallback)
     pn_meta: dict[str, dict[str, str]] = {}

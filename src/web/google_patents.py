@@ -352,7 +352,8 @@ def web_search_patents(
         url = r.get("url", "")
         m = PATENT_NUMBER_RE.search(url)
         if m:
-            pn = _normalize_patent_number(m.group(1))
+            raw_match = m.group(1) or m.group(2)  # group(1)=URL pattern, group(2)=bare CN
+            pn = _normalize_patent_number(raw_match)
             if pn not in seen:
                 if country and not pn.upper().startswith(country.upper()):
                     continue
@@ -364,7 +365,8 @@ def web_search_patents(
         for r in all_results:
             text = r.get("title", "") + " " + r.get("content", "")
             for m in PATENT_NUMBER_RE.finditer(text):
-                pn = _normalize_patent_number(m.group(1))
+                raw_match = m.group(1) or m.group(2)
+                pn = _normalize_patent_number(raw_match)
                 if pn not in seen:
                     if country and not pn.upper().startswith(country.upper()):
                         continue
@@ -388,7 +390,8 @@ def web_search_patents(
         url = r.get("url", "")
         m = PATENT_NUMBER_RE.search(url)
         if m:
-            pn = _normalize_patent_number(m.group(1))
+            raw_match = m.group(1) or m.group(2)
+            pn = _normalize_patent_number(raw_match)
             if pn not in pn_meta:
                 pn_meta[pn] = {
                     "title": r.get("title", ""),

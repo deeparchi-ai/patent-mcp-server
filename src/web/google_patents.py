@@ -253,6 +253,9 @@ def web_search_patents(
     Used as fallback when BigQuery returns zero results for CN+CPC queries where
     BigQuery's CPC classification coverage is sparse.
 
+    Runs 3 parallel search queries across 2 pages each for broader coverage,
+    then deduplicates and enriches results.
+
     Args:
         cpc: CPC classification code (e.g., 'H01L25/065')
         query: Additional keyword query
@@ -262,45 +265,63 @@ def web_search_patents(
     Returns:
         List of PatentBasic objects with details from Google Patents web scraping.
     """
-    # Build search query
-    search_parts: list[str] = []
+    # Build multiple search queries for broader coverage
+    cpc_quoted = f'"{cpc}"' if cpc else ""
+    base_queries: list[str] = []
     if cpc:
-        search_parts.append(f'"{cpc}"')
-    if country:
-        search_parts.append(country)
-    if query:
-        search_parts.append(query)
-    search_parts.append("patent")
+        base_queries = [
+            f'{cpc_quoted} {country or ""} patent semiconductor'.strip(),
+            f'{cpc_quoted} {country or ""} 专利 封装 芯片'.strip(),
+            f'{cpc_quoted} {country or ""} 半导体 封装'.strip(),
+        ]
+    else:
+        base_queries = [f'{query or ""} {country or ""} patent'.strip()]
 
-    search_query = " ".join(search_parts)
     logger.info(
-        "Web search fallback: query=%r cpc=%s country=%s", search_query, cpc, country
+        "Web search fallback: cpc=%s country=%s queries=%d", cpc, country, len(base_queries)
     )
 
-    # Search via SearXNG
-    try:
-        resp = requests.get(
-            f"{SEARXNG_URL}/search",
-            params={"q": search_query, "format": "json", "categories": "general"},
-            headers=HEADERS,
-            timeout=TIMEOUT,
-            proxies={"http": "", "https": ""},  # bypass proxy for local SearXNG
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        logger.warning("SearXNG search failed: %s", e)
-        return []
+    # Collect all results across queries and pages
+    all_results: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
 
-    results = data.get("results", [])
-    logger.info("SearXNG returned %d raw results", len(results))
+    for search_query in base_queries:
+        for page in [1, 2]:
+            try:
+                resp = requests.get(
+                    f"{SEARXNG_URL}/search",
+                    params={
+                        "q": search_query,
+                        "format": "json",
+                        "categories": "general",
+                        "pageno": page,
+                    },
+                    headers=HEADERS,
+                    timeout=20,
+                    proxies={"http": "", "https": ""},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                page_results = data.get("results", [])
+                for r in page_results:
+                    url = r.get("url", "")
+                    if url not in seen_urls:
+                        seen_urls.add(url)
+                        all_results.append(r)
+                logger.debug("Query %r page %d: %d results", search_query[:40], page, len(page_results))
+                if not page_results:  # No more pages
+                    break
+            except Exception as e:
+                logger.warning("SearXNG search failed for %r page %d: %s", search_query[:40], page, e)
+
+    logger.info("SearXNG returned %d unique results across all queries", len(all_results))
 
     # Extract patent numbers from search results
     seen: set[str] = set()
     patent_numbers: list[str] = []
 
     # First pass: extract from patents.google.com URLs
-    for r in results:
+    for r in all_results:
         url = r.get("url", "")
         m = PATENT_NUMBER_RE.search(url)
         if m:
@@ -313,7 +334,7 @@ def web_search_patents(
 
     # Second pass: extract from any text if we need more
     if len(patent_numbers) < limit:
-        for r in results:
+        for r in all_results:
             text = r.get("title", "") + " " + r.get("content", "")
             for m in PATENT_NUMBER_RE.finditer(text):
                 pn = _normalize_patent_number(m.group(1))
@@ -336,7 +357,7 @@ def web_search_patents(
 
     # Build lookup: patent number → search result metadata (for fallback)
     pn_meta: dict[str, dict[str, str]] = {}
-    for r in results:
+    for r in all_results:
         url = r.get("url", "")
         m = PATENT_NUMBER_RE.search(url)
         if m:

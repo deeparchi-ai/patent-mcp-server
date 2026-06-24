@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patent MCP 对比演示 — 专利检索的四重境界</title>
+<style>
+  :root {
+    --bg: #FFFFFF; --text: #1D1D1F; --text-secondary: #6E6E73;
+    --blue: #0071E3; --red: #FF3B30; --amber: #FF9500; --green: #34C759;
+    --border: #D2D2D7; --card-bg: #F5F5F7; --code-bg: #1D1D1F;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.7;
+  }
+  .hero { text-align: center; padding: 80px 24px 48px; max-width: 900px; margin: 0 auto; }
+  .hero h1 { font-size: 44px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
+  .hero p { font-size: 19px; color: var(--text-secondary); max-width: 680px; margin: 0 auto 32px; }
+  .query-box {
+    background: var(--card-bg); border-radius: 16px; padding: 20px 24px;
+    text-align: left; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px;
+    color: var(--text-secondary); max-width: 720px; margin: 0 auto;
+  }
+  .query-box .label { color: var(--blue); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .query-box .q { color: var(--text); font-size: 15px; }
+
+  .spectrum { max-width: 1200px; margin: 0 auto 32px; padding: 0 24px; }
+  .spectrum-bar {
+    display: flex; align-items: center; gap: 0; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 12px;
+  }
+  .spectrum-bar .s1 { flex: 1; background: var(--red); }
+  .spectrum-bar .s2 { flex: 1; background: var(--amber); }
+  .spectrum-bar .s3 { flex: 1; background: #FFCC02; }
+  .spectrum-bar .s4 { flex: 1; background: var(--green); }
+  .spectrum-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+
+  .comparison { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; max-width: 1400px; margin: 0 auto; padding: 0 24px 80px; }
+  @media (max-width: 1100px) { .comparison { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 640px) { .comparison { grid-template-columns: 1fr; } }
+
+  .col {
+    background: var(--card-bg); border-radius: 16px; padding: 22px 18px;
+    position: relative; border: 1px solid var(--border); display: flex; flex-direction: column;
+  }
+  .col.winner { border: 2px solid var(--green); box-shadow: 0 0 0 4px rgba(52,199,89,0.1); }
+
+  .col-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .col-icon { font-size: 24px; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .col-icon.web { background: #FEE2E2; }
+  .col-icon.llm { background: #FFF3E0; }
+  .col-icon.search { background: #FFFDE7; }
+  .col-icon.mcp { background: #E8F5E9; }
+
+  .col-name { font-size: 15px; font-weight: 700; }
+  .col-sub { font-size: 12px; color: var(--text-secondary); }
+  .result-count { font-size: 12px; color: var(--text-secondary); margin-bottom: 14px; }
+
+  .web-result { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .web-result .url { font-size: 10px; color: #1A0DAB; margin-bottom: 1px; }
+  .web-result .title { font-size: 13px; color: #1A0DAB; font-weight: 500; margin-bottom: 3px; }
+  .web-result .snippet { font-size: 11px; color: #545454; line-height: 1.4; }
+  .fail-tag { display: inline-block; background: #FEE2E2; color: var(--red); font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-left: 6px; font-weight: 600; }
+
+  .llm-msg { background: white; border-radius: 10px; padding: 12px; margin-bottom: 10px; font-size: 12px; line-height: 1.6; border: 1px solid #E5E5EA; }
+  .llm-msg .label-row { font-size: 10px; font-weight: 700; color: var(--amber); margin-bottom: 6px; letter-spacing: 0.5px; }
+  .hallucination-warn {
+    display: flex; align-items: flex-start; gap: 6px; background: #FFF8E1;
+    border: 1px solid #FFE082; border-radius: 8px; padding: 10px; margin-top: 10px;
+    font-size: 11px; color: #E65100; line-height: 1.5;
+  }
+
+  .patent-card {
+    background: white; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
+    border: 1px solid #E5E5EA; font-size: 12px; line-height: 1.5;
+  }
+  .patent-card .pn { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; font-weight: 700; color: var(--blue); margin-bottom: 4px; }
+  .patent-card .field { display: flex; gap: 6px; margin-bottom: 1px; }
+  .patent-card .field-key { color: var(--text-secondary); font-weight: 500; min-width: 55px; flex-shrink: 0; font-size: 11px; }
+  .patent-card .field-val { color: var(--text); font-size: 12px; }
+  .patent-card .warn { color: var(--amber); font-size: 11px; font-weight: 600; }
+  .patent-card .ok { color: var(--green); font-size: 11px; font-weight: 600; }
+
+  .verdict-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin-top: auto; padding-top: 16px; }
+  .verdict { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; letter-spacing: 0.5px; }
+  .verdict.fail { background: #FEE2E2; color: var(--red); }
+  .verdict.warn { background: #FFF3E0; color: var(--amber); }
+  .verdict.yellow { background: #FFFDE7; color: #8D6E00; }
+  .verdict.pass { background: #E8F5E9; color: var(--green); }
+
+  .winner-badge {
+    position: absolute; top: -10px; right: 20px; background: var(--green);
+    color: white; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.5px;
+  }
+
+  .score-grid { max-width: 1400px; margin: 0 auto 80px; padding: 0 24px; }
+  .score-grid h2 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 28px; letter-spacing: -0.3px; }
+  .score-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .score-table th { text-align: left; padding: 10px 12px; font-size: 11px; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid var(--border); }
+  .score-table th:first-child { width: 30%; }
+  .score-table th:not(:first-child) { text-align: center; width: 17.5%; }
+  .score-table td { padding: 12px; border-bottom: 1px solid #F0F0F0; }
+  .score-table td:not(:first-child) { text-align: center; }
+  .score-table .dimension { font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 1px; }
+  .dot.r { background: var(--red); } .dot.a { background: var(--amber); } .dot.y { background: #FFCC02; } .dot.g { background: var(--green); }
+
+  .aha { max-width: 1000px; margin: 0 auto 80px; padding: 0 24px; text-align: center; }
+  .aha h2 { font-size: 26px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.3px; }
+  .aha .subtitle { font-size: 15px; color: var(--text-secondary); margin-bottom: 32px; }
+  .aha-flow { display: flex; align-items: stretch; gap: 0; }
+  @media (max-width: 800px) { .aha-flow { flex-direction: column; } }
+  .aha-step {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 14px; text-align: center; position: relative; flex: 1;
+    border: 2px solid var(--border);
+  }
+  .aha-step:first-child { border-radius: 14px 0 0 14px; }
+  .aha-step:last-child  { border-radius: 0 14px 14px 0; }
+  .aha-step:not(:last-child) { border-right: none; }
+  @media (max-width: 800px) {
+    .aha-step:first-child { border-radius: 14px 14px 0 0; }
+    .aha-step:last-child  { border-radius: 0 0 14px 14px; }
+    .aha-step:not(:last-child) { border-right: 2px solid var(--border); border-bottom: none; }
+  }
+  .aha-step.s1 { flex: 0.8;  background: #FEF2F2; }
+  .aha-step.s2 { flex: 0.9;  background: #FFF7ED; }
+  .aha-step.s3 { flex: 1.0;  background: #FFFDE7; }
+  .aha-step.s4 {
+    flex: 1.5; background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%);
+    border: 3px solid var(--green); box-shadow: 0 4px 24px rgba(52,199,89,0.15); z-index: 1;
+  }
+  .aha-step .num {
+    width: 32px; height: 32px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 14px; font-weight: 800; margin-bottom: 12px;
+  }
+  .s1 .num { background: #FCA5A5; color: #7F1D1D; }
+  .s2 .num { background: #FDBA74; color: #7C2D12; }
+  .s3 .num { background: #FDE047; color: #713F12; }
+  .s4 .num { background: var(--green); color: white; }
+  .aha-step .label { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+  .s1 .label { color: #991B1B; } .s2 .label { color: #9A3412; }
+  .s3 .label { color: #8D6E00; } .s4 .label { color: #166534; }
+  .aha-step .punch { font-size: 17px; font-weight: 800; line-height: 1.3; letter-spacing: -0.2px; margin-bottom: 6px; }
+  .s1 .punch, .s2 .punch, .s3 .punch { color: var(--text); }
+  .s4 .punch { color: #14532D; font-size: 20px; }
+  .aha-step .why { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+  .s4 .why { color: #166534; font-weight: 500; }
+  .aha-arrow {
+    display: flex; align-items: center; justify-content: center; width: 28px;
+    flex-shrink: 0; color: var(--text-secondary); font-size: 18px; font-weight: 300;
+  }
+  @media (max-width: 800px) { .aha-arrow { width: 100%; height: 24px; transform: rotate(90deg); } }
+
+  .cta { text-align: center; padding: 0 24px 100px; max-width: 600px; margin: 0 auto; }
+  .cta h3 { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+  .cta p { color: var(--text-secondary); font-size: 14px; margin-bottom: 20px; }
+  .cta code { background: var(--code-bg); color: #64D2FF; padding: 12px 20px; border-radius: 10px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; display: inline-block; text-align: left; line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <h1>同一个问题，四个工具。<br>从无用信息到地面真相。</h1>
+  <p>当你问「中国 Chiplet 先进封装领域有哪些专利（CPC H01L25/065）」——搜索引擎、大模型、搜索增强模型、结构化专利数据库分别给出什么答案。</p>
+  <div class="query-box">
+    <div class="label">🔍 查询</div>
+    <div class="q">查找中国公司在 Chiplet 先进封装领域（CPC H01L25/065）的专利。<br>需要 5 条结果，包含专利权人、申请日、发明人、中文标题。</div>
+  </div>
+</section>
+
+<div class="spectrum">
+  <div class="spectrum-bar"><div class="s1"></div><div class="s2"></div><div class="s3"></div><div class="s4"></div></div>
+  <div class="spectrum-labels">
+    <span>🔴 毫无用处</span><span>🟠 幻觉编造</span><span>🟡 真但不准</span><span>🟢 地面真相</span>
+  </div>
+</div>
+
+<div class="comparison">
+
+  <!-- COL 1: 搜索引擎 -->
+  <div class="col">
+    <div class="col-header">
+      <div class="col-icon web">🌐</div>
+      <div><div class="col-name">搜索引擎</div><div class="col-sub">Google · 百度 · Bing</div></div>
+    </div>
+    <div class="result-count">🔗 10 个蓝色链接 · 零条专利</div>
+    <div class="web-result"><div class="url">semiconductor-today.com</div><div class="title">2024 全球先进封装行业报告 <span class="fail-tag">不是专利</span></div><div class="snippet">先进封装市场趋势分析，涵盖台积电、英特尔、三星等主要玩家……</div></div>
+    <div class="web-result"><div class="url">tsmc.com</div><div class="title">台积电 3DFabric™ 技术白皮书 <span class="fail-tag">不是专利</span></div><div class="snippet">芯片堆叠与先进封装平台技术概述……</div></div>
+    <div class="web-result"><div class="url">zhihu.com</div><div class="title">Chiplet 是国产芯片弯道超车的唯一出路吗？<span class="fail-tag">不是专利</span></div><div class="snippet">很多人认为 Chiplet 可以解决先进制程受限的问题……</div></div>
+    <div class="web-result"><div class="url">ieeexplore.ieee.org</div><div class="title">2.5D/3D 集成技术综述 <span class="fail-tag">不是专利</span></div><div class="snippet">基于中介层和 TSV 的集成方法学术综述……</div></div>
+    <div class="verdict-row"><span class="verdict fail">没有专利号</span><span class="verdict fail">没有专利权人</span><span class="verdict fail">没有 CPC</span><span class="verdict fail">非结构化</span></div>
+  </div>
+
+  <!-- COL 2: LLM 大模型 -->
+  <div class="col">
+    <div class="col-header">
+      <div class="col-icon llm">🤖</div>
+      <div><div class="col-name">大模型对话</div><div class="col-sub">ChatGPT · DeepSeek</div></div>
+    </div>
+    <div class="result-count">💬 文字流畅 · 事实编造</div>
+
+    <div class="llm-msg">
+      <div class="label-row">ChatGPT — 「看起来像真的专利号」</div>
+      "长电科技 CN-114287057-A、中芯国际 CN-113257757-B、华为 CN-111370387-A……"
+    </div>
+    <div class="llm-msg">
+      <div class="label-row">DeepSeek — 「新到不可能存在」</div>
+      "山东盛芯 — Chiplet EMC 复合材料 — 2026年1月16日<br>山东盛芯 — 芯粒立体分层互连 — 2026年1月16日"
+    </div>
+
+    <div class="hallucination-warn">
+      <span>⚠️</span><div>
+        <strong>两种幻觉模式：</strong><br>
+        · ChatGPT：专利号格式正确但内容张冠李戴，无法验证<br>
+        · DeepSeek：公司名称真实，但 2026 年 1 月的专利<em>不可能</em>已公开——专利申请有 18 个月公开期<br>
+        · 两者都没有给出专利号，无法验证任何一条
+      </div>
+    </div>
+
+    <div class="verdict-row">
+      <span class="verdict warn">编造专利号</span><span class="verdict warn">日期不可能</span><span class="verdict warn">无引用数据</span>
+    </div>
+  </div>
+
+  <!-- COL 3: 搜索增强模型（Kimi） -->
+  <div class="col">
+    <div class="col-header">
+      <div class="col-icon search">🔎</div>
+      <div><div class="col-name">搜索增强模型</div><div class="col-sub">Kimi · 网页搜索 + 大模型</div></div>
+    </div>
+    <div class="result-count">✅ 5 条真实专利 · ❌ CPC 归类错误</div>
+
+    <div class="patent-card">
+      <div class="pn">CN116686085A</div>
+      <div class="field"><span class="field-key">专利权人</span><span class="field-val">华为技术有限公司</span></div>
+      <div class="field"><span class="field-key">申请日</span><span class="field-val">2021-05-24</span></div>
+      <div class="ok">✓ 真实专利</div>
+      <div class="warn">✗ 并非 H01L25/065 分类</div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN113707621B</div>
+      <div class="field"><span class="field-key">专利权人</span><span class="field-val">甬矽电子（宁波）</span></div>
+      <div class="field"><span class="field-key">申请日</span><span class="field-val">2021-10-29</span></div>
+      <div class="ok">✓ 真实专利</div>
+      <div class="warn">✗ 实际为 H10W，非 H01L25/065</div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN111312697A</div>
+      <div class="field"><span class="field-key">专利权人</span><span class="field-val">西安微电子技术研究所</span></div>
+      <div class="field"><span class="field-key">申请日</span><span class="field-val">2020-02-28</span></div>
+      <div class="ok">✓ 真实专利</div>
+      <div class="warn">✗ 实际为 H10W，非 H01L25/065</div>
+    </div>
+
+    <div class="hallucination-warn" style="margin-top:8px;">
+      <span>🔍</span><div>
+        <strong>CPC 为什么错了：</strong>Kimi 用网页搜索了「Chiplet H01L25/065」，找到了页面中提到这些关键词的真实专利。但网页能发现专利号，<em>无法验证专利的结构化分类字段</em>——5 条专利没有一条真正属于 H01L25/065。
+      </div>
+    </div>
+
+    <div class="verdict-row">
+      <span class="verdict yellow">专利号真实 ✓</span><span class="verdict yellow">CPC 错误 ✗</span><span class="verdict yellow">元数据未验证</span>
+    </div>
+  </div>
+
+  <!-- COL 4: PATENT MCP -->
+  <div class="col winner">
+    <div class="winner-badge">✓ 地面真相</div>
+    <div class="col-header">
+      <div class="col-icon mcp">📊</div>
+      <div><div class="col-name">Patent MCP</div><div class="col-sub">deeparchi-patent-mcp v1.7.0</div></div>
+    </div>
+    <div class="result-count">✅ 5 条真实专利 · CPC 已验证 · 数据库支撑</div>
+
+    <div class="patent-card">
+      <div class="pn">CN-102543969-A</div>
+      <div class="field"><span class="field-key">专利权人</span><span class="field-val">工研院 ITRI</span></div>
+      <div class="field"><span class="field-key">中文标题</span><span class="field-val">晶片级模封接合结构及其制造方法</span></div>
+      <div class="field"><span class="field-key">申请日</span><span class="field-val">2011-02-01</span></div>
+      <div class="field"><span class="field-key">发明人</span><span class="field-val">陆苏财、庄敬业、林育民</span></div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN-102194708-A</div>
+      <div class="field"><span class="field-key">专利权人</span><span class="field-val">Alpha & Omega Semiconductor</span></div>
+      <div class="field"><span class="field-key">中文标题</span><span class="field-val">一种薄型封装的工艺</span></div>
+      <div class="field"><span class="field-key">申请日</span><span class="field-val">2010-03-19</span></div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN-103872027</div>
+      <div class="field"><span class="field-key">专利权人</span><span class="field-val">工研院 ITRI</span></div>
+      <div class="field"><span class="field-key">中文标题</span><span class="field-val">堆栈式功率元件模块</span></div>
+      <div class="field"><span class="field-key">申请日</span><span class="field-val">2013-01-29</span></div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN-101097932-A</div>
+      <div class="field"><span class="field-key">专利权人</span><span class="field-val">个人（曾世宪）</span></div>
+      <div class="field"><span class="field-key">中文标题</span><span class="field-val">低噪声轻薄型光电感测装置及其制造方法</span></div>
+      <div class="field"><span class="field-key">申请日</span><span class="field-val">2006-06-30</span></div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN-113257757-B</div>
+      <div class="field"><span class="field-key">专利权人</span><span class="field-val">北京大学</span></div>
+      <div class="field"><span class="field-key">中文标题</span><span class="field-val">一种硅基扇出型封装结构及其制备方法</span></div>
+      <div class="field"><span class="field-key">申请日</span><span class="field-val">2021-05-21</span></div>
+      <div class="field"><span class="field-key">发明人</span><span class="field-val">王玮、杨宇驰、杜建宇</span></div>
+    </div>
+
+    <div class="verdict-row">
+      <span class="verdict pass">真实专利</span><span class="verdict pass">CPC 已验证</span><span class="verdict pass">数据库支撑</span><span class="verdict pass">中英双语</span><span class="verdict pass">Agent 原生</span>
+    </div>
+  </div>
+</div>
+
+<!-- Aha 递进阶梯 -->
+<div class="aha">
+  <h2>不是「找到更多」——是找到<em>可验证的正确</em>数据</h2>
+  <p class="subtitle">同一个查询。四种工具。只有一条路通往地面真相。</p>
+  <div class="aha-flow">
+    <div class="aha-step s1">
+      <div class="num">1</div>
+      <div class="label">搜索引擎</div>
+      <div class="punch">十个链接。<br>零条专利。</div>
+      <div class="why">Agent 需要爬取 10 个格式各异的页面。失败率高。没有任何结构化数据。</div>
+    </div>
+    <div class="aha-arrow">→</div>
+    <div class="aha-step s2">
+      <div class="num">2</div>
+      <div class="label">大模型对话</div>
+      <div class="punch">听起来像真的。<br>其实不是。</div>
+      <div class="why">专利号是编的。日期不可能存在。Agent 基于虚构内容做分析，没有任何验证手段。</div>
+    </div>
+    <div class="aha-arrow">→</div>
+    <div class="aha-step s3">
+      <div class="num">3</div>
+      <div class="label">搜索增强模型</div>
+      <div class="punch">专利号是真的。<br>分类是错的。</div>
+      <div class="why">网页搜索能找到真实专利号。但 CPC 等结构化字段全部归因错误。接近 ≠ 正确。</div>
+    </div>
+    <div class="aha-arrow">→</div>
+    <div class="aha-step s4">
+      <div class="num">4</div>
+      <div class="label">Patent MCP</div>
+      <div class="punch">每个字段<br>都经过验证。</div>
+      <div class="why">数据库支撑。CPC 真实。专利权人真实。日期真实。Agent 直接消费结构化 JSON——零损耗。</div>
+    </div>
+  </div>
+</div>
+
+<!-- 评分表 -->
+<div class="score-grid">
+  <h2>能力对比</h2>
+  <table class="score-table">
+    <tr><th>维度</th><th>搜索引擎</th><th>大模型对话</th><th>搜索增强</th><th>Patent MCP</th></tr>
+    <tr>
+      <td class="dimension">返回专利号</td>
+      <td><span class="dot r"></span> 藏在链接里</td>
+      <td><span class="dot a"></span> 编造的</td>
+      <td><span class="dot y"></span><span class="dot y"></span> 真实 ✓</td>
+      <td><span class="dot g"></span><span class="dot g"></span> 真实且已验证</td>
+    </tr>
+    <tr>
+      <td class="dimension">CPC 分类</td>
+      <td><span class="dot r"></span> 无</td>
+      <td><span class="dot r"></span> 幻觉</td>
+      <td><span class="dot a"></span> 归因错误</td>
+      <td><span class="dot g"></span><span class="dot g"></span> 数据库支撑</td>
+    </tr>
+    <tr>
+      <td class="dimension">专利权人准确性</td>
+      <td><span class="dot r"></span> 需人肉提取</td>
+      <td><span class="dot a"></span> 可能混淆</td>
+      <td><span class="dot y"></span><span class="dot y"></span> 基本正确</td>
+      <td><span class="dot g"></span><span class="dot g"></span> 数据库字段</td>
+    </tr>
+    <tr>
+      <td class="dimension">申请日期准确性</td>
+      <td><span class="dot r"></span> 散落页面中</td>
+      <td><span class="dot r"></span> 不可能的日期</td>
+      <td><span class="dot y"></span><span class="dot y"></span> 准确</td>
+      <td><span class="dot g"></span><span class="dot g"></span> 实时查询</td>
+    </tr>
+    <tr>
+      <td class="dimension">引用关系（X/Y/A/D）</td>
+      <td><span class="dot r"></span> 无</td>
+      <td><span class="dot r"></span> 无</td>
+      <td><span class="dot r"></span> 无</td>
+      <td><span class="dot g"></span><span class="dot g"></span> BigQuery 原生</td>
+    </tr>
+    <tr>
+      <td class="dimension">可重复性</td>
+      <td><span class="dot r"></span> 每次不同</td>
+      <td><span class="dot r"></span> 每次不同</td>
+      <td><span class="dot a"></span> 依赖搜索结果</td>
+      <td><span class="dot g"></span><span class="dot g"></span> 确定性查询</td>
+    </tr>
+    <tr>
+      <td class="dimension">Agent 可消费性</td>
+      <td><span class="dot r"></span> 需要解析</td>
+      <td><span class="dot a"></span> 需要提取</td>
+      <td><span class="dot a"></span> 需要验证</td>
+      <td><span class="dot g"></span><span class="dot g"></span> 工具调用即数据</td>
+    </tr>
+    <tr>
+      <td class="dimension">中国专利准确性</td>
+      <td><span class="dot r"></span> 翻译混乱</td>
+      <td><span class="dot r"></span> 训练数据少</td>
+      <td><span class="dot y"></span><span class="dot y"></span> 较好</td>
+      <td><span class="dot g"></span><span class="dot g"></span> 中英双语</td>
+    </tr>
+  </table>
+</div>
+
+<div class="cta">
+  <h3>你的 Agent 需要地面真相。不是蓝色链接。不是幻觉。不是「差不多」。</h3>
+  <p>MIT 开源 · 本地部署 · 56 项测试 · 中国专利真实字段验证</p>
+  <code>$ pip install deeparchi-patent-mcp<br>$ deeparchi-patent-mcp</code>
+  <p style="margin-top: 16px;">
+    <a href="https://github.com/deeparchi-ai/patent-mcp-server" style="color: var(--blue); text-decoration: none; font-weight: 600; font-size: 14px;">github.com/deeparchi-ai/patent-mcp-server →</a>
+  </p>
+</div>
+
+</body>
+</html>

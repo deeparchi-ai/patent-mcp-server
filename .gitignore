@@ -12,3 +12,4 @@ dist/
 # Local-only scripts with credentials
 run.sh
 run-http.sh
+gcp-key.json

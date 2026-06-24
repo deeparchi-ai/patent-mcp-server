@@ -268,13 +268,20 @@ def _discover_related_patents(
         List of normalized CN patent numbers (DOCDB format).
     """
     try:
-        url = GOOGLE_PATENTS_URL.format(pub=patent_number)
-        resp = requests.get(
-            url,
-            headers=HEADERS,
-            timeout=TIMEOUT,
-        )
-        resp.raise_for_status()
+        # Convert DOCDB format (CN-1409778) to URL format (CN1409778A)
+        # Try multiple kind codes: A (application), B (granted), U (utility model)
+        for kind in ("A", "B", "U", ""):
+            url_pn = patent_number.replace("-", "")
+            if kind and not url_pn[-1].isalpha():
+                url_pn += kind
+            url = GOOGLE_PATENTS_URL.format(pub=url_pn)
+            resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            if resp.status_code == 200:
+                break
+            logger.debug("Google Patents %s returned %d, trying next kind code", url_pn, resp.status_code)
+        else:
+            logger.warning("No valid Google Patents URL found for %s", patent_number)
+            return []
 
         matches = _RELATED_CN_PATENT_RE.findall(resp.text)
         seen: set[str] = set()
@@ -332,13 +339,16 @@ def web_search_patents(
 
     # Build multiple search queries — Chinese for CN, English otherwise
     cpc_stripped = cpc.replace("/", " ") if cpc else ""
+    cpc_quoted = f'"{cpc}"' if cpc else ""
     base_queries: list[str] = []
     if cpc:
         if is_cn:
+            # DuckDuckGo needs quoted CPC to avoid / being treated as separator
             base_queries = [
-                f'{cpc} CN 专利 半导体 封装',
-                f'{cpc} CN 专利 patents.google.com',
-                f'{cpc} CN 专利 wanfangdata patent',
+                f'{cpc_quoted} CN patent semiconductor',
+                f'{cpc_quoted} CN 专利 半导体 封装',
+                f'{cpc_quoted} CN patents.google.com',
+                f'{cpc} CN 专利 wanfangdata',
             ]
         else:
             cpc_quoted = f'"{cpc}"'

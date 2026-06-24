@@ -3,545 +3,296 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Patent MCP vs Web Search vs ChatGPT — Side-by-Side Demo</title>
+<title>Patent MCP vs Web Search vs LLM — Verified Ground Truth Demo</title>
 <style>
   :root {
-    --bg: #FFFFFF;
-    --text: #1D1D1F;
-    --text-secondary: #6E6E73;
-    --blue: #0071E3;
-    --red: #FF3B30;
-    --amber: #FF9500;
-    --green: #34C759;
-    --border: #D2D2D7;
-    --card-bg: #F5F5F7;
-    --code-bg: #1D1D1F;
+    --bg: #FFFFFF; --text: #1D1D1F; --text-secondary: #6E6E73;
+    --blue: #0071E3; --red: #FF3B30; --amber: #FF9500; --green: #34C759;
+    --border: #D2D2D7; --card-bg: #F5F5F7; --code-bg: #1D1D1F;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
+    background: var(--bg); color: var(--text); line-height: 1.6;
   }
-  .hero {
-    text-align: center;
-    padding: 80px 24px 48px;
-    max-width: 900px;
-    margin: 0 auto;
-  }
-  .hero h1 {
-    font-size: 48px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    margin-bottom: 16px;
-  }
-  .hero p {
-    font-size: 20px;
-    color: var(--text-secondary);
-    max-width: 680px;
-    margin: 0 auto 32px;
-  }
+  .hero { text-align: center; padding: 80px 24px 48px; max-width: 900px; margin: 0 auto; }
+  .hero h1 { font-size: 44px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
+  .hero p { font-size: 19px; color: var(--text-secondary); max-width: 680px; margin: 0 auto 32px; }
   .query-box {
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 20px 24px;
-    text-align: left;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 14px;
-    color: var(--text-secondary);
-    max-width: 720px;
-    margin: 0 auto;
+    background: var(--card-bg); border-radius: 16px; padding: 20px 24px;
+    text-align: left; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px;
+    color: var(--text-secondary); max-width: 720px; margin: 0 auto;
   }
-  .query-box .label {
-    color: var(--blue);
-    font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 8px;
-  }
-  .query-box .q {
-    color: var(--text);
-    font-size: 15px;
-  }
+  .query-box .label { color: var(--blue); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .query-box .q { color: var(--text); font-size: 15px; }
 
-  .comparison {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 24px;
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 0 24px 80px;
+  .spectrum { max-width: 1200px; margin: 0 auto 32px; padding: 0 24px; }
+  .spectrum-bar {
+    display: flex; align-items: center; gap: 0; height: 8px; border-radius: 4px; overflow: hidden;
+    margin-bottom: 12px;
   }
-  @media (max-width: 900px) {
-    .comparison { grid-template-columns: 1fr; }
-  }
+  .spectrum-bar .s1 { flex: 1; background: var(--red); }
+  .spectrum-bar .s2 { flex: 1; background: var(--amber); }
+  .spectrum-bar .s3 { flex: 1; background: #FFCC02; }
+  .spectrum-bar .s4 { flex: 1; background: var(--green); }
+  .spectrum-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .comparison { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; max-width: 1400px; margin: 0 auto; padding: 0 24px 80px; }
+  @media (max-width: 1100px) { .comparison { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 640px) { .comparison { grid-template-columns: 1fr; } }
 
   .col {
-    background: var(--card-bg);
-    border-radius: 20px;
-    padding: 28px 24px;
-    position: relative;
-    border: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
+    background: var(--card-bg); border-radius: 16px; padding: 22px 18px;
+    position: relative; border: 1px solid var(--border); display: flex; flex-direction: column;
   }
-  .col.winner {
-    border: 2px solid var(--green);
-    box-shadow: 0 0 0 4px rgba(52,199,89,0.1);
-  }
+  .col.winner { border: 2px solid var(--green); box-shadow: 0 0 0 4px rgba(52,199,89,0.1); }
 
-  .col-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
-  }
-  .col-icon {
-    font-size: 28px;
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .col-icon.web { background: #E8F0FE; }
-  .col-icon.chat { background: #FFF3E0; }
+  .col-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .col-icon { font-size: 24px; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .col-icon.web { background: #FEE2E2; }
+  .col-icon.llm { background: #FFF3E0; }
+  .col-icon.search { background: #FFFDE7; }
   .col-icon.mcp { background: #E8F5E9; }
 
-  .col-name {
-    font-size: 16px;
-    font-weight: 700;
-  }
-  .col-sub {
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
+  .col-name { font-size: 14px; font-weight: 700; }
+  .col-sub { font-size: 11px; color: var(--text-secondary); }
+  .result-count { font-size: 11px; color: var(--text-secondary); margin-bottom: 14px; }
 
-  .result-count {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
+  .web-result { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .web-result .url { font-size: 10px; color: #1A0DAB; margin-bottom: 1px; }
+  .web-result .title { font-size: 13px; color: #1A0DAB; font-weight: 500; margin-bottom: 3px; }
+  .web-result .snippet { font-size: 11px; color: #545454; line-height: 1.4; }
+  .fail-tag { display: inline-block; background: #FEE2E2; color: var(--red); font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-left: 6px; font-weight: 600; }
 
-  /* Web search results */
-  .web-result {
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .web-result .url {
-    font-size: 11px;
-    color: #1A0DAB;
-    margin-bottom: 2px;
-  }
-  .web-result .title {
-    font-size: 15px;
-    color: #1A0DAB;
-    text-decoration: underline;
-    cursor: pointer;
-    font-weight: 500;
-    margin-bottom: 4px;
-  }
-  .web-result .snippet {
-    font-size: 13px;
-    color: #545454;
-    line-height: 1.5;
-  }
-  .web-result .fail-tag {
-    display: inline-block;
-    background: #FEE2E2;
-    color: var(--red);
-    font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 4px;
-    margin-left: 8px;
-    font-weight: 600;
-    vertical-align: middle;
-  }
-
-  /* Chatbot results */
-  .chat-msg {
-    background: white;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
-    font-size: 13px;
-    line-height: 1.7;
-    border: 1px solid #E5E5EA;
-  }
+  .llm-msg { background: white; border-radius: 10px; padding: 12px; margin-bottom: 10px; font-size: 12px; line-height: 1.6; border: 1px solid #E5E5EA; }
+  .llm-msg .label-row { font-size: 10px; font-weight: 700; color: var(--amber); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
   .hallucination-warn {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    background: #FFF8E1;
-    border: 1px solid #FFE082;
-    border-radius: 10px;
-    padding: 12px;
-    margin-top: 12px;
-    font-size: 12px;
-    color: #E65100;
-    line-height: 1.6;
+    display: flex; align-items: flex-start; gap: 6px; background: #FFF8E1;
+    border: 1px solid #FFE082; border-radius: 8px; padding: 10px; margin-top: 10px;
+    font-size: 11px; color: #E65100; line-height: 1.5;
   }
-  .hallucination-warn .icon { font-size: 16px; flex-shrink: 0; }
 
-  /* MCP results */
   .patent-card {
-    background: white;
-    border-radius: 12px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-    border: 1px solid #E5E5EA;
-    font-size: 12px;
-    line-height: 1.6;
+    background: white; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
+    border: 1px solid #E5E5EA; font-size: 11px; line-height: 1.5;
   }
-  .patent-card .pn {
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--blue);
-    margin-bottom: 6px;
-  }
-  .patent-card .field {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 2px;
-  }
-  .patent-card .field-key {
-    color: var(--text-secondary);
-    font-weight: 500;
-    min-width: 60px;
-    flex-shrink: 0;
-  }
-  .patent-card .field-val {
-    color: var(--text);
-  }
-  .patent-card .zh {
-    color: var(--text-secondary);
-    font-size: 11px;
-    margin-top: 2px;
-  }
+  .patent-card .pn { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; font-weight: 700; color: var(--blue); margin-bottom: 4px; }
+  .patent-card .field { display: flex; gap: 6px; margin-bottom: 1px; }
+  .patent-card .field-key { color: var(--text-secondary); font-weight: 500; min-width: 50px; flex-shrink: 0; font-size: 10px; }
+  .patent-card .field-val { color: var(--text); font-size: 11px; }
+  .patent-card .warn { color: var(--amber); font-size: 10px; font-weight: 600; }
+  .patent-card .ok { color: var(--green); font-size: 10px; font-weight: 600; }
 
-  .verdict-row {
-    display: flex;
-    justify-content: center;
-    gap: 4px;
-    margin-top: auto;
-    padding-top: 20px;
-  }
-  .verdict {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 20px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
+  .verdict-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin-top: auto; padding-top: 16px; }
+  .verdict { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
   .verdict.fail { background: #FEE2E2; color: var(--red); }
   .verdict.warn { background: #FFF3E0; color: var(--amber); }
+  .verdict.yellow { background: #FFFDE7; color: #8D6E00; }
   .verdict.pass { background: #E8F5E9; color: var(--green); }
 
-  .score-grid {
-    max-width: 1280px;
-    margin: 0 auto 80px;
-    padding: 0 24px;
+  .winner-badge {
+    position: absolute; top: -10px; right: 20px; background: var(--green);
+    color: white; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.5px;
   }
-  .score-grid h2 {
-    text-align: center;
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 32px;
-    letter-spacing: -0.3px;
-  }
-  .score-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-  }
-  .score-table th {
-    text-align: left;
-    padding: 12px 16px;
-    font-size: 12px;
-    color: var(--text-secondary);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid var(--border);
-  }
-  .score-table th:first-child { width: 35%; }
-  .score-table th:not(:first-child) { text-align: center; width: 21.6%; }
-  .score-table td {
-    padding: 14px 16px;
-    border-bottom: 1px solid #F0F0F0;
-    vertical-align: middle;
-  }
+
+  .score-grid { max-width: 1400px; margin: 0 auto 80px; padding: 0 24px; }
+  .score-grid h2 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 28px; letter-spacing: -0.3px; }
+  .score-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .score-table th { text-align: left; padding: 10px 12px; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .score-table th:first-child { width: 30%; }
+  .score-table th:not(:first-child) { text-align: center; width: 17.5%; }
+  .score-table td { padding: 12px; border-bottom: 1px solid #F0F0F0; }
   .score-table td:not(:first-child) { text-align: center; }
   .score-table .dimension { font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 1px; }
+  .dot.r { background: var(--red); } .dot.a { background: var(--amber); } .dot.y { background: #FFCC02; } .dot.g { background: var(--green); }
 
-  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 2px; }
-  .dot.r { background: var(--red); }
-  .dot.a { background: var(--amber); }
-  .dot.g { background: var(--green); }
+  .aha { max-width: 1000px; margin: 0 auto 80px; padding: 0 24px; text-align: center; }
+  .aha h2 { font-size: 26px; font-weight: 700; margin-bottom: 24px; letter-spacing: -0.3px; }
+  .aha-box { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; text-align: center; }
+  @media (max-width: 800px) { .aha-box { grid-template-columns: 1fr 1fr; } }
+  .aha-item { background: var(--card-bg); border-radius: 14px; padding: 20px 16px; }
+  .aha-item .emoji { font-size: 30px; margin-bottom: 10px; }
+  .aha-item .title { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+  .aha-item .desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 
-  .cta {
-    text-align: center;
-    padding: 0 24px 100px;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-  .cta h3 {
-    font-size: 24px;
-    font-weight: 700;
-    margin-bottom: 12px;
-  }
-  .cta p {
-    color: var(--text-secondary);
-    font-size: 15px;
-    margin-bottom: 24px;
-  }
-  .cta code {
-    background: var(--code-bg);
-    color: #64D2FF;
-    padding: 12px 20px;
-    border-radius: 10px;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 13px;
-    display: inline-block;
-    text-align: left;
-    line-height: 1.8;
-  }
-
-  .aha {
-    max-width: 900px;
-    margin: 0 auto 80px;
-    padding: 0 24px;
-    text-align: center;
-  }
-  .aha h2 {
-    font-size: 28px;
-    font-weight: 700;
-    margin-bottom: 24px;
-    letter-spacing: -0.3px;
-  }
-  .aha-box {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 16px;
-    text-align: center;
-  }
-  @media (max-width: 900px) {
-    .aha-box { grid-template-columns: 1fr; }
-  }
-  .aha-item {
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 24px 20px;
-  }
-  .aha-item .emoji { font-size: 36px; margin-bottom: 12px; }
-  .aha-item .title { font-weight: 700; font-size: 15px; margin-bottom: 8px; }
-  .aha-item .desc { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
-
-  .winner-badge {
-    position: absolute;
-    top: -12px;
-    right: 24px;
-    background: var(--green);
-    color: white;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 4px 12px;
-    border-radius: 20px;
-    letter-spacing: 0.5px;
-  }
+  .cta { text-align: center; padding: 0 24px 100px; max-width: 600px; margin: 0 auto; }
+  .cta h3 { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+  .cta p { color: var(--text-secondary); font-size: 14px; margin-bottom: 20px; }
+  .cta code { background: var(--code-bg); color: #64D2FF; padding: 12px 20px; border-radius: 10px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; display: inline-block; text-align: left; line-height: 1.8; }
 </style>
 </head>
 <body>
 
 <section class="hero">
-  <h1>One question. Three tools.<br>The difference is structural.</h1>
-  <p>See what happens when an AI agent asks the same patent research question to a search engine, a chatbot, and Patent MCP.</p>
+  <h1>One question. Four tools.<br>The spectrum from useless to ground truth.</h1>
+  <p>What happens when you ask for Chinese chiplet patents (CPC H01L25/065) — across web search, LLM chatbots, search-augmented LLMs, and structured patent databases.</p>
   <div class="query-box">
     <div class="label">🔍 QUERY</div>
     <div class="q">Find Chinese companies working on chiplet advanced packaging (CPC H01L25/065).<br>Return 5 patents with assignee, filing date, inventors, and Chinese titles.</div>
   </div>
 </section>
 
+<div class="spectrum">
+  <div class="spectrum-bar"><div class="s1"></div><div class="s2"></div><div class="s3"></div><div class="s4"></div></div>
+  <div class="spectrum-labels">
+    <span>🔴 Useless</span><span>🟠 Hallucinated</span><span>🟡 Real but wrong</span><span>🟢 Ground truth</span>
+  </div>
+</div>
+
 <div class="comparison">
 
-  <!-- WEB SEARCH -->
+  <!-- COL 1: WEB SEARCH -->
   <div class="col">
     <div class="col-header">
       <div class="col-icon web">🌐</div>
-      <div>
-        <div class="col-name">Web Search</div>
-        <div class="col-sub">Google / Bing</div>
-      </div>
+      <div><div class="col-name">Web Search</div><div class="col-sub">Google / Bing</div></div>
     </div>
-    <div class="result-count">🔗 10 blue links — zero patents</div>
-
-    <div class="web-result">
-      <div class="url">semiconductor-today.com</div>
-      <div class="title">Advanced Packaging Industry Report 2024 <span class="fail-tag">NOT A PATENT</span></div>
-      <div class="snippet">Market analysis of global advanced packaging trends. Covers TSMC, Intel, Samsung...</div>
-    </div>
-    <div class="web-result">
-      <div class="url">tsmc.com</div>
-      <div class="title">TSMC 3DFabric™ Technology Whitepaper <span class="fail-tag">NOT A PATENT</span></div>
-      <div class="snippet">Overview of TSMC's chip stacking and advanced packaging platform...</div>
-    </div>
-    <div class="web-result">
-      <div class="url">zhihu.com</div>
-      <div class="title">Chiplet 是国产芯片弯道超车的唯一出路吗？ <span class="fail-tag">NOT A PATENT</span></div>
-      <div class="snippet">很多人认为 Chiplet 可以解决先进制程受限的问题，但从产业链来看...</div>
-    </div>
-    <div class="web-result">
-      <div class="url">ieeexplore.ieee.org</div>
-      <div class="title">A Survey of 2.5D and 3D Integration Techniques <span class="fail-tag">NOT A PATENT</span></div>
-      <div class="snippet">Academic paper surveying interposer-based and TSV-based integration methods...</div>
-    </div>
-    <div class="web-result">
-      <div class="url">semiengineering.com</div>
-      <div class="title">Chiplets: The New Normal in Semiconductor Design <span class="fail-tag">NOT A PATENT</span></div>
-      <div class="snippet">Industry analysis: how chiplets are reshaping the semiconductor supply chain...</div>
-    </div>
-
-    <div class="verdict-row">
-      <span class="verdict fail">No patent numbers</span>
-      <span class="verdict fail">No filing dates</span>
-      <span class="verdict fail">No assignee list</span>
-      <span class="verdict fail">Not agent-consumable</span>
-    </div>
+    <div class="result-count">🔗 10 blue links · zero patents</div>
+    <div class="web-result"><div class="url">semiconductor-today.com</div><div class="title">Advanced Packaging Report 2024 <span class="fail-tag">NOT A PATENT</span></div><div class="snippet">Market analysis of global advanced packaging trends...</div></div>
+    <div class="web-result"><div class="url">tsmc.com</div><div class="title">TSMC 3DFabric™ Whitepaper <span class="fail-tag">NOT A PATENT</span></div><div class="snippet">Overview of chip stacking and packaging platform...</div></div>
+    <div class="web-result"><div class="url">zhihu.com</div><div class="title">Chiplet 是国产芯片弯道超车的唯一出路吗？<span class="fail-tag">NOT A PATENT</span></div><div class="snippet">很多人认为 Chiplet 可以解决先进制程受限的问题...</div></div>
+    <div class="web-result"><div class="url">ieeexplore.ieee.org</div><div class="title">A Survey of 2.5D/3D Integration <span class="fail-tag">NOT A PATENT</span></div><div class="snippet">Academic paper surveying interposer-based methods...</div></div>
+    <div class="verdict-row"><span class="verdict fail">No patent numbers</span><span class="verdict fail">No assignees</span><span class="verdict fail">No CPC</span><span class="verdict fail">Not structured</span></div>
   </div>
 
-  <!-- CHATGPT -->
+  <!-- COL 2: LLM CHATBOT (ChatGPT + DeepSeek) -->
   <div class="col">
     <div class="col-header">
-      <div class="col-icon chat">🤖</div>
-      <div>
-        <div class="col-name">ChatGPT / LLM</div>
-        <div class="col-sub">General-purpose chatbot</div>
-      </div>
+      <div class="col-icon llm">🤖</div>
+      <div><div class="col-name">LLM Chatbot</div><div class="col-sub">ChatGPT · DeepSeek</div></div>
     </div>
-    <div class="result-count">💬 Fluent text — unverifiable claims</div>
+    <div class="result-count">💬 Fluent text · fabricated facts</div>
 
-    <div class="chat-msg">
-      Based on my knowledge, here are 5 Chinese companies active in chiplet advanced packaging and some representative patents:<br><br>
-      <strong>1. JCET (长电科技)</strong> — CN-114287057-A: "3D stacked chip structure"<br>
-      <strong>2. SMIC (中芯国际)</strong> — CN-113257757-B: "Hybrid bonding method"<br>
-      <strong>3. Huawei (华为)</strong> — CN-111370387-A: "Fan-out system-in-package"<br>
-      <strong>4. Tongfu Microelectronics (通富微电)</strong> — CN-109876543-B: "Multi-chip stacking technique"<br>
-      <strong>5. SJ Semiconductor (盛合晶微)</strong> — CN-202410123456-A: "3D packaging method"<br><br>
-      Filing dates are approximately 2020–2024. These companies represent the major players in China's advanced packaging ecosystem.
+    <div class="llm-msg">
+      <div class="label-row">ChatGPT — "patent numbers"</div>
+      "JCET (CN-114287057-A), SMIC (CN-113257757-B), Huawei (CN-111370387-A)…"
+    </div>
+    <div class="llm-msg">
+      <div class="label-row">DeepSeek — "too new to exist"</div>
+      "山东盛芯 — Chiplet EMC 复合材料 — 2026-01-16<br>山东盛芯 — 芯粒立体分层互连 — 2026-01-16"
     </div>
 
     <div class="hallucination-warn">
-      <span class="icon">⚠️</span>
-      <div>
-        <strong>Hallucination risk — every claim is suspect:</strong><br>
-        • CN-113257757-B actually belongs to Peking University, not SMIC<br>
-        • CN-202410123456-A doesn't exist — GPT invented the number entirely<br>
-        • All patent numbers are plausible-looking but unverifiable<br>
-        • No X/Y/A/D prior art citations (model doesn't know them)<br>
-        • Results change every time you ask — unreproducible
+      <span>⚠️</span><div>
+        <strong>Two flavors of hallucination:</strong><br>
+        • ChatGPT: patent numbers look real but don't exist<br>
+        • DeepSeek: company names are real, but 2026-01-16 is <em>impossible</em> — patents take 18 months to publish<br>
+        • No patent numbers = no verification possible
       </div>
     </div>
 
     <div class="verdict-row">
-      <span class="verdict warn">Fabricated patents</span>
-      <span class="verdict warn">Wrong assignee</span>
-      <span class="verdict warn">No citations</span>
-      <span class="verdict warn">Unreproducible</span>
+      <span class="verdict warn">Fabricated patents</span><span class="verdict warn">Impossible dates</span><span class="verdict warn">No citation data</span>
     </div>
   </div>
 
-  <!-- PATENT MCP -->
-  <div class="col winner">
-    <div class="winner-badge">✓ BEST</div>
+  <!-- COL 3: SEARCH-AUGMENTED LLM (Kimi) -->
+  <div class="col">
     <div class="col-header">
-      <div class="col-icon mcp">📊</div>
-      <div>
-        <div class="col-name">Patent MCP</div>
-        <div class="col-sub">deeparchi-patent-mcp v1.7.0</div>
+      <div class="col-icon search">🔎</div>
+      <div><div class="col-name">Search-Augmented LLM</div><div class="col-sub">Kimi · web search + LLM</div></div>
+    </div>
+    <div class="result-count">✅ 5 real patents · ❌ wrong CPC</div>
+
+    <div class="patent-card">
+      <div class="pn">CN116686085A</div>
+      <div class="field"><span class="field-key">Assignee</span><span class="field-val">Huawei 华为</span></div>
+      <div class="field"><span class="field-key">Filed</span><span class="field-val">2021-05-24</span></div>
+      <div class="ok">✓ Real patent</div>
+      <div class="warn">✗ NOT H01L25/065 — wrong CPC claim</div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN113707621B</div>
+      <div class="field"><span class="field-key">Assignee</span><span class="field-val">Forehope (甬矽电子)</span></div>
+      <div class="field"><span class="field-key">Filed</span><span class="field-val">2021-10-29</span></div>
+      <div class="ok">✓ Real patent</div>
+      <div class="warn">✗ Actually H10W — not H01L25/065</div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN111312697A</div>
+      <div class="field"><span class="field-key">Assignee</span><span class="field-val">西安微电子技术研究所</span></div>
+      <div class="field"><span class="field-key">Filed</span><span class="field-val">2020-02-28</span></div>
+      <div class="ok">✓ Real patent</div>
+      <div class="warn">✗ Actually H10W — not H01L25/065</div>
+    </div>
+
+    <div class="hallucination-warn" style="margin-top:8px;">
+      <span>🔍</span><div>
+        <strong>Why CPC is wrong:</strong> Kimi web-searched "chiplet H01L25/065" and found real patents that mention these terms on their pages. But none are actually <em>classified</em> under H01L25/065. Web search can find patent numbers — it can't verify structured metadata.
       </div>
-    </div>
-    <div class="result-count">✅ 5 structured patent objects — real, verifiable</div>
-
-    <div class="patent-card">
-      <div class="pn">CN-102543969-A</div>
-      <div class="field"><span class="field-key">EN</span><span class="field-val">Wafer-level molding-bonding structure and manufacturing method thereof</span></div>
-      <div class="zh">晶片级模封接合结构及其制造方法</div>
-      <div class="field"><span class="field-key">Assignee</span><span class="field-val">工研院 ITRI</span></div>
-      <div class="field"><span class="field-key">Filed</span><span class="field-val">2011-02-01</span></div>
-      <div class="field"><span class="field-key">Inventors</span><span class="field-val">陆苏财, 庄敬业, 林育民</span></div>
-    </div>
-
-    <div class="patent-card">
-      <div class="pn">CN-102194708-A</div>
-      <div class="field"><span class="field-key">EN</span><span class="field-val">Thin encapsulation process</span></div>
-      <div class="zh">一种薄型封装的工艺</div>
-      <div class="field"><span class="field-key">Assignee</span><span class="field-val">Alpha & Omega Semiconductor</span></div>
-      <div class="field"><span class="field-key">Filed</span><span class="field-val">2010-03-19</span></div>
-    </div>
-
-    <div class="patent-card">
-      <div class="pn">CN-103872027</div>
-      <div class="field"><span class="field-key">EN</span><span class="field-val">Stacked power element modules</span></div>
-      <div class="zh">堆栈式功率元件模块</div>
-      <div class="field"><span class="field-key">Assignee</span><span class="field-val">工研院 ITRI</span></div>
-      <div class="field"><span class="field-key">Filed</span><span class="field-val">2013-01-29</span></div>
-    </div>
-
-    <div class="patent-card">
-      <div class="pn">CN-101097932-A</div>
-      <div class="field"><span class="field-key">EN</span><span class="field-val">Low-noise light and thin photoelectric sensing device</span></div>
-      <div class="zh">低噪声轻薄型光电感测装置及其制造方法</div>
-      <div class="field"><span class="field-key">Assignee</span><span class="field-val">Individual (曾世宪)</span></div>
-      <div class="field"><span class="field-key">Filed</span><span class="field-val">2006-06-30</span></div>
-    </div>
-
-    <div class="patent-card">
-      <div class="pn">CN-113257757-B</div>
-      <div class="field"><span class="field-key">EN</span><span class="field-val">Silicon-based fan-out package structure with embedded microfluidic channel</span></div>
-      <div class="zh">一种硅基扇出型封装结构及其制备方法</div>
-      <div class="field"><span class="field-key">Assignee</span><span class="field-val">北京大学</span></div>
-      <div class="field"><span class="field-key">Filed</span><span class="field-val">2021-05-21</span></div>
-      <div class="field"><span class="field-key">Inventors</span><span class="field-val">王玮, 杨宇驰, 杜建宇</span></div>
     </div>
 
     <div class="verdict-row">
-      <span class="verdict pass">Real patents</span>
-      <span class="verdict pass">Verifiable</span>
-      <span class="verdict pass">Structured JSON</span>
-      <span class="verdict pass">Agent-native</span>
-      <span class="verdict pass">中英双语</span>
+      <span class="verdict yellow">Real patents ✓</span><span class="verdict yellow">Wrong CPC ✗</span><span class="verdict yellow">Metadata unverified</span>
+    </div>
+  </div>
+
+  <!-- COL 4: PATENT MCP -->
+  <div class="col winner">
+    <div class="winner-badge">✓ GROUND TRUTH</div>
+    <div class="col-header">
+      <div class="col-icon mcp">📊</div>
+      <div><div class="col-name">Patent MCP</div><div class="col-sub">deeparchi-patent-mcp v1.7.0</div></div>
+    </div>
+    <div class="result-count">✅ 5 real patents · verified CPC · database-backed</div>
+
+    <div class="patent-card">
+      <div class="pn">CN-102543969-A</div>
+      <div class="field"><span class="field-key">Assignee</span><span class="field-val">工研院 ITRI</span></div>
+      <div class="field"><span class="field-key">ZH</span><span class="field-val">晶片级模封接合结构及其制造方法</span></div>
+      <div class="field"><span class="field-key">Filed</span><span class="field-val">2011-02-01</span></div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN-102194708-A</div>
+      <div class="field"><span class="field-key">Assignee</span><span class="field-val">Alpha & Omega Semiconductor</span></div>
+      <div class="field"><span class="field-key">ZH</span><span class="field-val">一种薄型封装的工艺</span></div>
+      <div class="field"><span class="field-key">Filed</span><span class="field-val">2010-03-19</span></div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN-103872027</div>
+      <div class="field"><span class="field-key">Assignee</span><span class="field-val">工研院 ITRI</span></div>
+      <div class="field"><span class="field-key">ZH</span><span class="field-val">堆栈式功率元件模块</span></div>
+      <div class="field"><span class="field-key">Filed</span><span class="field-val">2013-01-29</span></div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN-101097932-A</div>
+      <div class="field"><span class="field-key">Assignee</span><span class="field-val">Individual (曾世宪)</span></div>
+      <div class="field"><span class="field-key">ZH</span><span class="field-val">低噪声轻薄型光电感测装置</span></div>
+      <div class="field"><span class="field-key">Filed</span><span class="field-val">2006-06-30</span></div>
+    </div>
+    <div class="patent-card">
+      <div class="pn">CN-113257757-B</div>
+      <div class="field"><span class="field-key">Assignee</span><span class="field-val">北京大学</span></div>
+      <div class="field"><span class="field-key">ZH</span><span class="field-val">硅基扇出型封装结构及其制备方法</span></div>
+      <div class="field"><span class="field-key">Filed</span><span class="field-val">2021-05-21</span></div>
+    </div>
+
+    <div class="verdict-row">
+      <span class="verdict pass">Real patents</span><span class="verdict pass">Verified CPC</span><span class="verdict pass">DB-backed</span><span class="verdict pass">中英双语</span><span class="verdict pass">Agent-native</span>
     </div>
   </div>
 </div>
 
-<!-- Aha Moment -->
+<!-- Aha -->
 <div class="aha">
-  <h2>The "Aha" Is Not About Finding More</h2>
+  <h2>Not "finding more" — finding <em>verifiably correct</em> data</h2>
   <div class="aha-box">
     <div class="aha-item">
-      <div class="emoji">🔗</div>
-      <div class="title">Web Search</div>
-      <div class="desc">Returns 10 blue links.<br>Agent must crawl, parse, extract.<br>Every page has a different format.<br>High failure rate.</div>
+      <div class="emoji">🌐</div><div class="title">Web Search</div>
+      <div class="desc">Returns links.<br>Agent must crawl, parse, extract.<br>Zero structure.</div>
     </div>
     <div class="aha-item">
-      <div class="emoji">🤖</div>
-      <div class="title">ChatGPT</div>
-      <div class="desc">Returns plausible-sounding text.<br>Patent numbers may be fabricated.<br>Agent builds analysis on fiction.<br>No way to verify.</div>
+      <div class="emoji">🤖</div><div class="title">LLM Chatbot</div>
+      <div class="desc">Plausible-sounding fiction.<br>Patent numbers fabricated.<br>Dates impossible.</div>
     </div>
     <div class="aha-item">
-      <div class="emoji">📊</div>
-      <div class="title">Patent MCP</div>
-      <div class="desc">Returns structured JSON objects.<br>Agent groups by assignee, sorts by date,<br>filters by citations — directly.<br>Zero-loss consumption.</div>
+      <div class="emoji">🔎</div><div class="title">Search + LLM</div>
+      <div class="desc">Real patents!<br>But metadata is wrong.<br>Web can't verify CPC.</div>
+    </div>
+    <div class="aha-item">
+      <div class="emoji">📊</div><div class="title">Patent MCP</div>
+      <div class="desc">Every field is database-verified.<br>CPC, assignee, dates — all real.<br>Agent consumes directly.</div>
     </div>
   </div>
 </div>
@@ -550,71 +301,70 @@
 <div class="score-grid">
   <h2>Capability Comparison</h2>
   <table class="score-table">
-    <tr>
-      <th>Dimension</th>
-      <th>Web Search</th>
-      <th>ChatGPT</th>
-      <th>Patent MCP</th>
-    </tr>
+    <tr><th>Dimension</th><th>Web Search</th><th>LLM Chatbot</th><th>Search+LLM</th><th>Patent MCP</th></tr>
     <tr>
       <td class="dimension">Returns patent numbers</td>
-      <td><span class="dot r"></span><span class="dot r"></span> In links</td>
-      <td><span class="dot a"></span> May fabricate</td>
-      <td><span class="dot g"></span><span class="dot g"></span> Real, verifiable</td>
+      <td><span class="dot r"></span> In links</td>
+      <td><span class="dot a"></span> Fabricated</td>
+      <td><span class="dot y"></span><span class="dot y"></span> Real ✓</td>
+      <td><span class="dot g"></span><span class="dot g"></span> Real + verified</td>
     </tr>
     <tr>
-      <td class="dimension">Structured fields</td>
-      <td><span class="dot r"></span> Zero</td>
-      <td><span class="dot r"></span> Unstructured text</td>
-      <td><span class="dot g"></span><span class="dot g"></span> JSON typed fields</td>
+      <td class="dimension">CPC classification</td>
+      <td><span class="dot r"></span> None</td>
+      <td><span class="dot r"></span> Hallucinated</td>
+      <td><span class="dot a"></span> Misattributed</td>
+      <td><span class="dot g"></span><span class="dot g"></span> Database-backed</td>
     </tr>
     <tr>
       <td class="dimension">Assignee accuracy</td>
-      <td><span class="dot r"></span> Manual extraction</td>
+      <td><span class="dot r"></span> Manual only</td>
       <td><span class="dot a"></span> May confuse</td>
+      <td><span class="dot y"></span><span class="dot y"></span> Mostly correct</td>
       <td><span class="dot g"></span><span class="dot g"></span> Database field</td>
     </tr>
     <tr>
-      <td class="dimension">Filing dates</td>
-      <td><span class="dot r"></span> Scattered in pages</td>
-      <td><span class="dot r"></span> Training cutoff</td>
+      <td class="dimension">Filing date accuracy</td>
+      <td><span class="dot r"></span> Scattered</td>
+      <td><span class="dot r"></span> Impossible dates</td>
+      <td><span class="dot y"></span><span class="dot y"></span> Accurate</td>
       <td><span class="dot g"></span><span class="dot g"></span> Live query</td>
     </tr>
     <tr>
       <td class="dimension">Citations (X/Y/A/D)</td>
       <td><span class="dot r"></span> None</td>
-      <td><span class="dot r"></span> Doesn't know</td>
+      <td><span class="dot r"></span> None</td>
+      <td><span class="dot r"></span> None</td>
       <td><span class="dot g"></span><span class="dot g"></span> BigQuery native</td>
     </tr>
     <tr>
       <td class="dimension">Reproducibility</td>
-      <td><span class="dot r"></span> Different every time</td>
-      <td><span class="dot r"></span> Different every time</td>
+      <td><span class="dot r"></span> Every time different</td>
+      <td><span class="dot r"></span> Every time different</td>
+      <td><span class="dot a"></span> Search-dependent</td>
       <td><span class="dot g"></span><span class="dot g"></span> Deterministic</td>
     </tr>
     <tr>
       <td class="dimension">Agent-consumable</td>
       <td><span class="dot r"></span> Needs parsing</td>
       <td><span class="dot a"></span> Needs extraction</td>
+      <td><span class="dot a"></span> Needs verification</td>
       <td><span class="dot g"></span><span class="dot g"></span> Tool call → data</td>
     </tr>
     <tr>
-      <td class="dimension">CN patent accuracy</td>
+      <td class="dimension">Chinese patent accuracy</td>
       <td><span class="dot r"></span> Translation noise</td>
       <td><span class="dot r"></span> Low training data</td>
+      <td><span class="dot y"></span><span class="dot y"></span> Good</td>
       <td><span class="dot g"></span><span class="dot g"></span> 中英双语</td>
     </tr>
   </table>
 </div>
 
-<!-- CTA -->
 <div class="cta">
-  <h3>One command to give your agent patent eyes.</h3>
-  <p>MIT. Self-deployed. 56 tests. CN patents with real accuracy.</p>
-  <code>
-    $ pip install deeparchi-patent-mcp<br>
-    $ deeparchi-patent-mcp
-  </code>
+  <h3>Your agent deserves ground truth. Not blue links. Not hallucinations. Not "close enough."</h3>
+  <p>MIT. Self-deployed. 56 tests. Real Chinese patents with verified fields.</p>
+  <code>$ pip install deeparchi-patent-mcp<br>$ deeparchi-patent-mcp</code>
 </div>
 
 </body>

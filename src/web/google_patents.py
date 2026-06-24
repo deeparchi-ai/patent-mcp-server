@@ -29,6 +29,12 @@ TIMEOUT = 15
 # SearXNG endpoint for web search fallback (used when BigQuery CN CPC coverage is sparse)
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8888")
 
+# Proxy for Google Patents (direct access blocked by CAPTCHA 2026-06-24)
+# Inherits HTTPS_PROXY from environment, or defaults to Clash Verge proxy
+PROXIES = {
+    "https": os.environ.get("HTTPS_PROXY", "http://127.0.0.1:7897"),
+} if os.environ.get("HTTPS_PROXY") or True else None
+
 # Regex to extract patent numbers from URLs and text.
 # Covers Google Patents (patent/CN123456789A), wanfang (patent/CN202310083015.8),
 # tianyancha (/da672e95...), and plain CN number patterns.
@@ -113,7 +119,7 @@ def fetch_patent(publication_number: str) -> PatentDetail:
     url = GOOGLE_PATENTS_URL.format(pub=pub_clean)
 
     logger.info("Fetching %s", url)
-    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
     resp.raise_for_status()
     resp.encoding = "utf-8"
     html = resp.text
@@ -184,7 +190,7 @@ def fetch_patent(publication_number: str) -> PatentDetail:
     if country_code == "CN":
         try:
             zh_url = f"https://patents.google.com/patent/{pub_clean}/zh"
-            zh_resp = requests.get(zh_url, headers=HEADERS, timeout=TIMEOUT)
+            zh_resp = requests.get(zh_url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
             zh_resp.encoding = "utf-8"
             zh_html = zh_resp.text
 
@@ -236,7 +242,7 @@ def fetch_claims(publication_number: str) -> list[str]:
     url = GOOGLE_PATENTS_URL.format(pub=pub_clean)
 
     logger.info("Fetching claims from %s", url)
-    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
     resp.raise_for_status()
     resp.encoding = "utf-8"
 
@@ -275,7 +281,7 @@ def _discover_related_patents(
             if kind and not url_pn[-1].isalpha():
                 url_pn += kind
             url = GOOGLE_PATENTS_URL.format(pub=url_pn)
-            resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
             if resp.status_code == 200:
                 break
             logger.debug("Google Patents %s returned %d, trying next kind code", url_pn, resp.status_code)
@@ -337,11 +343,10 @@ def web_search_patents(
     """
     is_cn = (country or "").upper() == "CN"
 
-    # Choose engine based on what's working (Google/DuckDuckGo/Startpage all captcha-blocked)
+    # Choose engine based on what's working (as of 2026-06-24: Baidu/Google/Startpage blocked)
     if is_cn:
         search_params = {
-            "engines": "baidu",
-            "language": "zh-CN",
+            "engines": "duckduckgo",
         }
     else:
         search_params = {
@@ -354,11 +359,11 @@ def web_search_patents(
     base_queries: list[str] = []
     if cpc:
         if is_cn:
-            # Baidu engine: use Chinese patent search terms
+            # DuckDuckGo engine: use English patent queries with CN filter
             base_queries = [
-                f'{cpc} CN 专利 半导体 封装',
-                f'{cpc} CN 专利 patents.google.com',
-                f'{cpc} CN 专利 wanfangdata patent',
+                f'site:patents.google.com {cpc_quoted} CN',
+                f'{cpc_quoted} CN patent semiconductor packaging',
+                f'{cpc_quoted} 中国专利 芯片封装',
             ]
         else:
             cpc_quoted = f'"{cpc}"'

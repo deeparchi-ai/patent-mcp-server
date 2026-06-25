@@ -278,9 +278,10 @@ def create_server(project_id: str) -> Server:
                 name="bidirectional_citation_graph",
                 description=(
                     "Build full bidirectional citation graph for a company's"
-                    " core patents. Searches for company's patents on Google"
-                    " Patents, then fetches forward and backward citations for"
-                    " each. If competitor_keywords provided, also runs"
+                    " core patents. Use publication_numbers to specify patents"
+                    " directly (recommended—bypasses JS SPA search issue),"
+                    " or assignee_name for Google Patents search."
+                    " If competitor_keywords provided, also runs"
                     " competitor citation matrix. Returns: patents list,"
                     " forward_graph, backward_graph, competitor_matrix."
                 ),
@@ -289,7 +290,7 @@ def create_server(project_id: str) -> Server:
                     "properties": {
                         "assignee_name": {
                             "type": "string",
-                            "description": "Company name for patent search, e.g. 'Wuhan Carbit Information'",
+                            "description": "Company name for patent search. Not required if publication_numbers given.",
                         },
                         "competitor_keywords": {
                             "type": "array",
@@ -301,8 +302,12 @@ def create_server(project_id: str) -> Server:
                             "description": "Max patents to analyze (default 10)",
                             "default": 10,
                         },
+                        "publication_numbers": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Optional explicit patent numbers. Bypasses GP search (JS SPA). Preferred when you have patent numbers.",
+                        },
                     },
-                    "required": ["assignee_name"],
                 },
             ),
         ]
@@ -489,11 +494,12 @@ def create_server(project_id: str) -> Server:
                 ]
 
             elif name == "bidirectional_citation_graph":
-                assignee = str(arguments["assignee_name"])
+                assignee = str(arguments.get("assignee_name", ""))
                 keywords = list(arguments.get("competitor_keywords", [])) or None
                 limit = min(int(arguments.get("limit", 10)), 20)
+                pub_numbers = list(arguments.get("publication_numbers", [])) or None
                 result = await asyncio.to_thread(
-                    web_bidirectional_graph, assignee, keywords, limit
+                    web_bidirectional_graph, assignee, keywords, limit, pub_numbers
                 )
                 return [
                     TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))

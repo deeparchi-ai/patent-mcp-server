@@ -402,45 +402,57 @@ def competitor_citation_matrix(
 
 
 def bidirectional_citation_graph(
-    assignee_name: str,
+    assignee_name: str = "",
     competitor_keywords: list[str] | None = None,
     limit: int = 10,
+    publication_numbers: list[str] | None = None,
 ) -> dict[str, object]:
     """Build full bidirectional citation graph for a company's core patents.
 
     Steps:
-    1. Search for company's patents
+    1. Use publication_numbers if provided; otherwise search by assignee_name
     2. Get forward citations for each
     3. Get backward citations for each
     4. Build matrix
     5. If competitor_keywords provided, run competitor_citation_matrix
 
     Args:
-        assignee_name: company name for patent search
+        assignee_name: company name for patent search (ignored if publication_numbers given)
         competitor_keywords: optional list of competitor assignee substrings
         limit: max patents to analyze (default 10)
+        publication_numbers: optional explicit list of patent numbers to analyze.
+            Bypasses Google Patents search. Required when search is
+            unavailable—the GP search page is a JS SPA whose static HTML
+            returns zero patent links when fetched without JS rendering.
 
     Returns:
-        dict with keys: patents, forward_graph, backward_graph, competitor_matrix (if keywords provided)
+        dict with keys: patents, forward_graph, backward_graph, competitor_matrix
     """
-    # Step 1: Search for company's patents
-    search_url = f"https://patents.google.com/?assignee=%22{assignee_name}%22&num={limit}&country=CN"
-    logger.info("Searching patents for %s", assignee_name)
-    resp = requests.get(search_url, headers=HEADERS, timeout=TIMEOUT)
-    resp.raise_for_status()
-    html = resp.text
+    # DESIGN NOTE: Google Patents search results are client-rendered (JS SPA).
+    # The ?assignee= URL returns a Polymer shell with window.experiments config,
+    # NOT patent links. publication_numbers provides a reliable bypass.
+    # DO NOT REMOVE this parameter unless GP search becomes server-rendered.
+    if publication_numbers:
+        patents = list(publication_numbers)[:limit]
+        logger.info("Using %d explicit patent numbers (search bypassed)", len(patents))
+    else:
+        search_url = f"https://patents.google.com/?assignee=%22{assignee_name}%22&num={limit}&country=CN"
+        logger.info("Searching patents for %s", assignee_name)
+        resp = requests.get(search_url, headers=HEADERS, timeout=TIMEOUT)
+        resp.raise_for_status()
+        html = resp.text
 
-    patent_links = re.findall(r"/patent/(CN\d{5,12}[A-Z]\d?)/", html)
-    seen_pn: set[str] = set()
-    patents: list[str] = []
-    for p in patent_links:
-        if p not in seen_pn:
-            seen_pn.add(p)
-            patents.append(p)
-            if len(patents) >= limit:
-                break
+        patent_links = re.findall(r"/patent/(CN\d{5,12}[A-Z]\d?)/", html)
+        seen_pn: set[str] = set()
+        patents: list[str] = []
+        for p in patent_links:
+            if p not in seen_pn:
+                seen_pn.add(p)
+                patents.append(p)
+                if len(patents) >= limit:
+                    break
 
-    logger.info("Found %d core patents for %s", len(patents), assignee_name)
+        logger.info("Found %d core patents for %s", len(patents), assignee_name)
 
     # Step 2+3: Forward + backward citations
     forward_graph: dict[str, list[str]] = {}

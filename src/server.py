@@ -23,9 +23,14 @@ from mcp.types import (
 )
 
 from bigquery.client import BigQueryClient, BigQueryCostError, BigQueryError, PatentNotFoundError
+from web.google_patents import bidirectional_citation_graph as web_bidirectional_graph
+from web.google_patents import competitor_citation_matrix as web_competitor_matrix
+from web.google_patents import fetch_cited_by as web_fetch_cited_by
+from web.google_patents import fetch_cited_by_with_details as web_fetch_cited_by_with_details
 from web.google_patents import fetch_claims as web_fetch_claims
 from web.google_patents import fetch_patent as web_fetch_patent
 from web.google_patents import web_search_patents
+from web.legal_status import get_legal_status as web_get_legal_status
 
 logger = logging.getLogger("patent-mcp-server")
 
@@ -137,6 +142,169 @@ def create_server(project_id: str) -> Server:
                     "required": ["publication_number"],
                 },
             ),
+            Tool(
+                name="get_legal_status",
+                description=(
+                    "Get legal status of a patent from Google Patents page."
+                    " Extracts status (granted/application/utility_model),"
+                    " kind_code (A/B/U), filing_date, grant_date,"
+                    " priority_date, assignee, and legal events timeline."
+                    " Works for CN, US, EP, and most other jurisdictions."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "publication_number": {
+                            "type": "string",
+                            "description": (
+                                "Patent publication number, e.g. 'US-7650331-B1', 'CN-110286864-A'"
+                            ),
+                        },
+                    },
+                    "required": ["publication_number"],
+                },
+            ),
+            Tool(
+                name="get_patent_family",
+                description=(
+                    "Get patent family members for a patent. Finds family_id"
+                    " from BigQuery, then returns ALL patents sharing that"
+                    " family_id (same invention filed in different countries)."
+                    " Returns family_id, member_count, and members list with"
+                    " publication_number, country_code, kind_code, filing_date,"
+                    " grant_date, title for each."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "publication_number": {
+                            "type": "string",
+                            "description": (
+                                "Patent publication number, e.g. 'US-7650331-B1', 'CN-110286864-A'"
+                            ),
+                        },
+                    },
+                    "required": ["publication_number"],
+                },
+            ),
+            Tool(
+                name="batch_get_patents",
+                description=(
+                    "Get full details for multiple patents in a single call."
+                    " Much faster than calling get_patent N times separately."
+                    " Returns list of PatentDetail objects."
+                    " Max 20 patents per call."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "publication_numbers": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of patent numbers, e.g. ['CN110286864A', 'CN108668027A']",
+                        },
+                    },
+                    "required": ["publication_numbers"],
+                },
+            ),
+            Tool(
+                name="batch_get_cited_by",
+                description=(
+                    "Get cited-by counts and lists for multiple patents in a"
+                    " single call. Returns list of {publication_number,"
+                    " cited_by_count, cited_by_patents, cited_by_url}."
+                    " Max 10 patents per call."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "publication_numbers": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of patent numbers, e.g. ['CN110286864A', 'CN108668027A']",
+                        },
+                    },
+                    "required": ["publication_numbers"],
+                },
+            ),
+            Tool(
+                name="get_cited_by",
+                description=(
+                    "Get backward citations (who cites this patent)."
+                    " Returns cited_by_count (int) and cited_by_patents"
+                    " (list of {publication_number, title, assignee})."
+                    " Extracted from Google Patents HTML."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "publication_number": {
+                            "type": "string",
+                            "description": (
+                                "Patent publication number, e.g. 'US-7650331-B1', 'CN-110286864-A'"
+                            ),
+                        },
+                    },
+                    "required": ["publication_number"],
+                },
+            ),
+            Tool(
+                name="competitor_citation_matrix",
+                description=(
+                    "Check if a set of target patents are cited by competitors."
+                    " Searches each patent's cited-by list and matches citing"
+                    " assignees against competitor keywords (case-insensitive"
+                    " substring). Returns matrix: {patent: [{citing_patent,"
+                    " title, assignee, matched_keyword}]} and summary counts."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "publication_numbers": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of patent numbers to check, e.g. ['CN110286864A', 'CN108668027A']",
+                        },
+                        "competitor_keywords": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of competitor assignee name substrings, e.g. ['百度', 'Baidu', '华为', 'Huawei', 'Apple']",
+                        },
+                    },
+                    "required": ["publication_numbers", "competitor_keywords"],
+                },
+            ),
+            Tool(
+                name="bidirectional_citation_graph",
+                description=(
+                    "Build full bidirectional citation graph for a company's"
+                    " core patents. Searches for company's patents on Google"
+                    " Patents, then fetches forward and backward citations for"
+                    " each. If competitor_keywords provided, also runs"
+                    " competitor citation matrix. Returns: patents list,"
+                    " forward_graph, backward_graph, competitor_matrix."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "assignee_name": {
+                            "type": "string",
+                            "description": "Company name for patent search, e.g. 'Wuhan Carbit Information'",
+                        },
+                        "competitor_keywords": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Optional competitor assignee substrings, e.g. ['百度', '华为']",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max patents to analyze (default 10)",
+                            "default": 10,
+                        },
+                    },
+                    "required": ["assignee_name"],
+                },
+            ),
         ]
 
     @server.call_tool()  # type: ignore[untyped-decorator]
@@ -191,6 +359,41 @@ def create_server(project_id: str) -> Server:
                     TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))
                 ]
 
+            elif name == "batch_get_patents":
+                pubs = list(arguments["publication_numbers"])[:20]
+                results = []
+                for pub in pubs:
+                    try:
+                        pub_clean = str(pub)
+                        # Try web first
+                        try:
+                            r = await asyncio.to_thread(web_fetch_patent, pub_clean)
+                            results.append(r.model_dump(mode="json"))
+                        except Exception:
+                            try:
+                                r = await client.get_patent(pub_clean)
+                                results.append(r.model_dump(mode="json"))
+                            except PatentNotFoundError:
+                                results.append({"publication_number": pub_clean, "error": "not_found"})
+                    except Exception as e:
+                        results.append({"publication_number": str(pub), "error": str(e)})
+                return [
+                    TextContent(type="text", text=json.dumps(results, ensure_ascii=False, indent=2))
+                ]
+
+            elif name == "batch_get_cited_by":
+                pubs = list(arguments["publication_numbers"])[:10]
+                results = []
+                for pub in pubs:
+                    try:
+                        r = await asyncio.to_thread(web_fetch_cited_by_with_details, str(pub))
+                        results.append(r)
+                    except Exception as e:
+                        results.append({"publication_number": str(pub), "error": str(e)})
+                return [
+                    TextContent(type="text", text=json.dumps(results, ensure_ascii=False, indent=2))
+                ]
+
             elif name == "get_patent":
                 pub = str(arguments["publication_number"])
                 # Try web first (free), fallback to BigQuery for CPC codes + full metadata
@@ -220,6 +423,20 @@ def create_server(project_id: str) -> Server:
                 data["_source"] = source
                 return [
                     TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))
+                ]
+
+            elif name == "get_legal_status":
+                pub = str(arguments["publication_number"])
+                result = await asyncio.to_thread(web_get_legal_status, pub)
+                return [
+                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
+                ]
+
+            elif name == "get_patent_family":
+                pub = str(arguments["publication_number"])
+                result = await client.get_family(pub)
+                return [
+                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
                 ]
 
             elif name == "get_patent_claims":
@@ -254,6 +471,32 @@ def create_server(project_id: str) -> Server:
                             {"publication_number": pub, "claims": claims, "_source": source}
                         ),
                     )
+                ]
+
+            elif name == "get_cited_by":
+                pub = str(arguments["publication_number"])
+                result = await asyncio.to_thread(web_fetch_cited_by_with_details, pub)
+                return [
+                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False))
+                ]
+
+            elif name == "competitor_citation_matrix":
+                pubs = list(arguments["publication_numbers"])
+                keywords = list(arguments["competitor_keywords"])
+                result = await asyncio.to_thread(web_competitor_matrix, pubs, keywords)
+                return [
+                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
+                ]
+
+            elif name == "bidirectional_citation_graph":
+                assignee = str(arguments["assignee_name"])
+                keywords = list(arguments.get("competitor_keywords", [])) or None
+                limit = min(int(arguments.get("limit", 10)), 20)
+                result = await asyncio.to_thread(
+                    web_bidirectional_graph, assignee, keywords, limit
+                )
+                return [
+                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
                 ]
 
             else:

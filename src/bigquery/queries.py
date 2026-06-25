@@ -166,3 +166,26 @@ def get_patent_claims_query(publication_number: str) -> tuple[str, list[ScalarQu
         ORDER BY CAST(c.sequence AS INT64)
     """
     return sql, params
+
+
+def get_family_query(family_id: str) -> tuple[str, list[ScalarQueryParameter]]:
+    """Build query for all patent family members by family_id."""
+    params: list[ScalarQueryParameter] = [
+        ScalarQueryParameter("family_id", "STRING", family_id),
+    ]
+    sql = """
+        SELECT
+            publication_number,
+            country_code,
+            kind_code,
+            filing_date,
+            grant_date,
+            (SELECT text FROM UNNEST(title_localized)
+             WHERE language='en' LIMIT 1) AS title_en,
+            (SELECT text FROM UNNEST(title_localized)
+             WHERE language='zh' LIMIT 1) AS title_zh
+        FROM `patents-public-data.patents.publications`
+        WHERE family_id = @family_id
+        ORDER BY filing_date
+    """
+    return sql, params

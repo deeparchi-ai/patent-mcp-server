@@ -333,7 +333,7 @@ class BigQueryClient:
                 file=sys.stderr,
                 flush=True,
             )
-            return cached
+            return cached  # type: ignore[no-any-return]
 
         self._check_session_budget()
         self._check_budget(sql, params)
@@ -411,7 +411,7 @@ class BigQueryClient:
             import sys
 
             print("[CACHE] get_patent_claims: HIT — 0 GB scanned", file=sys.stderr, flush=True)
-            return cached
+            return cached  # type: ignore[no-any-return]
 
         self._check_session_budget()
         self._check_budget(sql, params)
@@ -437,7 +437,7 @@ class BigQueryClient:
         )
         return claims
 
-    async def get_family(self, publication_number: str) -> dict:
+    async def get_family(self, publication_number: str) -> dict[str, Any]:
         """Get patent family members for a publication number.
 
         Step 1: look up family_id from BigQuery (lightweight).
@@ -481,7 +481,7 @@ class BigQueryClient:
         family_key = self._cache_key(family_sql, family_params)
         family_cached = self._cache_get(family_key)
         if family_cached is not None:
-            return family_cached
+            return family_cached  # type: ignore[no-any-return]
 
         self._check_session_budget()
         family_job = self.client.query(

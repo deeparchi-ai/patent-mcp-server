@@ -487,9 +487,11 @@ def create_server(project_id: str) -> Server:
 
             elif name == "bidirectional_citation_graph":
                 assignee = str(arguments["assignee_name"])
-                keywords = list(arguments.get("competitor_keywords", [])) or None
+                keywords_comp = list(arguments.get("competitor_keywords", [])) or None
                 limit = min(int(arguments.get("limit", 10)), 20)
-                result = await asyncio.to_thread(web_bidirectional_graph, assignee, keywords, limit)
+                result = await asyncio.to_thread(
+                    web_bidirectional_graph, assignee, keywords_comp, limit
+                )
                 return [
                     TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
                 ]

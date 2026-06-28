@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 import requests
 
@@ -17,7 +18,7 @@ from web.google_patents import (
 logger = logging.getLogger(__name__)
 
 
-def get_legal_status(publication_number: str) -> dict:
+def get_legal_status(publication_number: str) -> dict[str, Any]:
     """Extract legal status indicators from Google Patents page metadata.
 
     Returns:

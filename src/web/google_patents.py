@@ -11,7 +11,7 @@ import os
 import re
 from datetime import date
 from html.parser import HTMLParser
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import requests
 
@@ -245,7 +245,7 @@ def fetch_patent(publication_number: str) -> PatentDetail:
 
 def fetch_cited_by(
     publication_number: str,
-) -> dict[str, int | list[str]]:
+) -> dict[str, Any]:
     """Fetch cited-by count from Google Patents web page (free).
 
     Extracts the number of patents that cite this patent from the patent
@@ -324,7 +324,7 @@ def fetch_cited_by(
 def fetch_cited_by_with_details(
     publication_number: str,
     max_enrich: int = 8,
-) -> dict[str, int | list[dict[str, str]]]:
+) -> dict[str, Any]:
     """Fetch cited-by count + list with title/assignee for top citing patents.
 
     Returns same as fetch_cited_by but first max_enrich cited_by_patents
@@ -371,7 +371,7 @@ def fetch_cited_by_with_details(
 def competitor_citation_matrix(
     publication_numbers: list[str],
     competitor_keywords: list[str],
-) -> dict[str, list[dict[str, str]]]:
+) -> dict[str, Any]:
     """Build competitor citation matrix for a set of target patents.
 
     For each target patent, fetches cited-by list and checks if any citing
@@ -464,7 +464,7 @@ def bidirectional_citation_graph(
 
     # Step 2+3: Forward + backward citations
     forward_graph: dict[str, list[str]] = {}
-    backward_graph: dict[str, dict] = {}
+    backward_graph: dict[str, dict[str, Any]] = {}
 
     for pn in patents:
         try:
@@ -717,7 +717,7 @@ def web_search_patents(
                     }
                     resp = requests.get(
                         f"{SEARXNG_URL}/search",
-                        params=params,
+                        params=params,  # type: ignore[arg-type]
                         headers=HEADERS,
                         timeout=20,
                     )

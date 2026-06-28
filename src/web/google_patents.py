@@ -35,9 +35,13 @@ FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v1/search"
 
 # Proxy for Google Patents (direct access blocked by CAPTCHA 2026-06-24)
 # Inherits HTTPS_PROXY from environment, or defaults to Clash Verge proxy
-PROXIES = {
-    "https": os.environ.get("HTTPS_PROXY", "http://127.0.0.1:7897"),
-} if os.environ.get("HTTPS_PROXY") or True else None
+PROXIES = (
+    {
+        "https": os.environ.get("HTTPS_PROXY", "http://127.0.0.1:7897"),
+    }
+    if os.environ.get("HTTPS_PROXY") or True
+    else None
+)
 
 # Regex to extract patent numbers from URLs and text.
 # Covers Google Patents (patent/CN123456789A), wanfang (patent/CN202310083015.8),
@@ -277,7 +281,10 @@ def fetch_cited_by(
     cited_by_patents: list[dict[str, str]] = []
     if cited_by_count > 0:
         try:
-            citedby_page_url = f"https://patents.google.com/patent/{pub_clean}/en?citedby&num={min(cited_by_count, 50)}"
+            citedby_page_url = (
+                f"https://patents.google.com/patent/{pub_clean}/en"
+                f"?citedby&num={min(cited_by_count, 50)}"
+            )
             logger.info("Fetching cited-by list from %s", citedby_page_url)
             resp2 = requests.get(citedby_page_url, headers=HEADERS, timeout=TIMEOUT)
             resp2.raise_for_status()
@@ -291,7 +298,7 @@ def fetch_cited_by(
                 page_html,
             )
             # Deduplicate, remove self-reference
-            self_clean = pub_clean.replace("A", "").replace("B", "").rstrip("0123456789")
+            pub_clean.replace("A", "").replace("B", "").rstrip("0123456789")
             seen: set[str] = set()
             for p in patent_links:
                 if p == pub_clean:
@@ -299,9 +306,11 @@ def fetch_cited_by(
                 if p in seen:
                     continue
                 seen.add(p)
-                cited_by_patents.append({
-                    "publication_number": p,
-                })
+                cited_by_patents.append(
+                    {
+                        "publication_number": p,
+                    }
+                )
         except Exception as e:
             logger.warning("Failed to extract cited-by list for %s: %s", publication_number, e)
 
@@ -330,23 +339,29 @@ def fetch_cited_by_with_details(
         if i < max_enrich:
             try:
                 detail = fetch_patent(_normalize_patent_number(pn))
-                enriched.append({
-                    "publication_number": pn,
-                    "title": detail.title or "",
-                    "assignee": detail.assignee or "",
-                })
+                enriched.append(
+                    {
+                        "publication_number": pn,
+                        "title": detail.title or "",
+                        "assignee": detail.assignee or "",
+                    }
+                )
             except Exception:
-                enriched.append({
+                enriched.append(
+                    {
+                        "publication_number": pn,
+                        "title": "",
+                        "assignee": "",
+                    }
+                )
+        else:
+            enriched.append(
+                {
                     "publication_number": pn,
                     "title": "",
                     "assignee": "",
-                })
-        else:
-            enriched.append({
-                "publication_number": pn,
-                "title": "",
-                "assignee": "",
-            })
+                }
+            )
 
     result["cited_by_patents"] = enriched
     result["_enriched"] = min(max_enrich, len(enriched))
@@ -383,12 +398,14 @@ def competitor_citation_matrix(
             assignee = citing.get("assignee", "").lower()
             for kw in competitor_keywords:
                 if kw.lower() in assignee:
-                    matches.append({
-                        "citing_patent": citing["publication_number"],
-                        "title": citing.get("title", ""),
-                        "assignee": citing.get("assignee", ""),
-                        "matched_keyword": kw,
-                    })
+                    matches.append(
+                        {
+                            "citing_patent": citing["publication_number"],
+                            "title": citing.get("title", ""),
+                            "assignee": citing.get("assignee", ""),
+                            "matched_keyword": kw,
+                        }
+                    )
                     summary[kw] = summary.get(kw, 0) + 1
                     break
 
@@ -402,57 +419,48 @@ def competitor_citation_matrix(
 
 
 def bidirectional_citation_graph(
-    assignee_name: str = "",
+    assignee_name: str,
     competitor_keywords: list[str] | None = None,
     limit: int = 10,
-    publication_numbers: list[str] | None = None,
 ) -> dict[str, object]:
     """Build full bidirectional citation graph for a company's core patents.
 
     Steps:
-    1. Use publication_numbers if provided; otherwise search by assignee_name
+    1. Search for company's patents
     2. Get forward citations for each
     3. Get backward citations for each
     4. Build matrix
     5. If competitor_keywords provided, run competitor_citation_matrix
 
     Args:
-        assignee_name: company name for patent search (ignored if publication_numbers given)
+        assignee_name: company name for patent search
         competitor_keywords: optional list of competitor assignee substrings
         limit: max patents to analyze (default 10)
-        publication_numbers: optional explicit list of patent numbers to analyze.
-            Bypasses Google Patents search. Required when search is
-            unavailable—the GP search page is a JS SPA whose static HTML
-            returns zero patent links when fetched without JS rendering.
 
     Returns:
-        dict with keys: patents, forward_graph, backward_graph, competitor_matrix
+        dict with keys: patents, forward_graph, backward_graph,
+        competitor_matrix (if keywords provided)
     """
-    # DESIGN NOTE: Google Patents search results are client-rendered (JS SPA).
-    # The ?assignee= URL returns a Polymer shell with window.experiments config,
-    # NOT patent links. publication_numbers provides a reliable bypass.
-    # DO NOT REMOVE this parameter unless GP search becomes server-rendered.
-    if publication_numbers:
-        patents = list(publication_numbers)[:limit]
-        logger.info("Using %d explicit patent numbers (search bypassed)", len(patents))
-    else:
-        search_url = f"https://patents.google.com/?assignee=%22{assignee_name}%22&num={limit}&country=CN"
-        logger.info("Searching patents for %s", assignee_name)
-        resp = requests.get(search_url, headers=HEADERS, timeout=TIMEOUT)
-        resp.raise_for_status()
-        html = resp.text
+    # Step 1: Search for company's patents
+    search_url = (
+        f"https://patents.google.com/?assignee=%22{assignee_name}%22&num={limit}&country=CN"
+    )
+    logger.info("Searching patents for %s", assignee_name)
+    resp = requests.get(search_url, headers=HEADERS, timeout=TIMEOUT)
+    resp.raise_for_status()
+    html = resp.text
 
-        patent_links = re.findall(r"/patent/(CN\d{5,12}[A-Z]\d?)/", html)
-        seen_pn: set[str] = set()
-        patents: list[str] = []
-        for p in patent_links:
-            if p not in seen_pn:
-                seen_pn.add(p)
-                patents.append(p)
-                if len(patents) >= limit:
-                    break
+    patent_links = re.findall(r"/patent/(CN\d{5,12}[A-Z]\d?)/", html)
+    seen_pn: set[str] = set()
+    patents: list[str] = []
+    for p in patent_links:
+        if p not in seen_pn:
+            seen_pn.add(p)
+            patents.append(p)
+            if len(patents) >= limit:
+                break
 
-        logger.info("Found %d core patents for %s", len(patents), assignee_name)
+    logger.info("Found %d core patents for %s", len(patents), assignee_name)
 
     # Step 2+3: Forward + backward citations
     forward_graph: dict[str, list[str]] = {}
@@ -483,9 +491,7 @@ def bidirectional_citation_graph(
 
     # Step 5: Competitor matrix
     if competitor_keywords:
-        result["competitor_matrix"] = competitor_citation_matrix(
-            patents, competitor_keywords
-        )
+        result["competitor_matrix"] = competitor_citation_matrix(patents, competitor_keywords)
 
     return result
 
@@ -538,11 +544,13 @@ def _firecrawl_search(query: str, limit: int = 10) -> list[dict[str, str]]:
 
         results = []
         for item in items:
-            results.append({
-                "url": item.get("url", ""),
-                "title": item.get("title", ""),
-                "content": item.get("description", ""),
-            })
+            results.append(
+                {
+                    "url": item.get("url", ""),
+                    "title": item.get("title", ""),
+                    "content": item.get("description", ""),
+                }
+            )
         logger.info("Firecrawl search %r: %d results", query[:60], len(results))
         return results
     except Exception as e:
@@ -579,7 +587,9 @@ def _discover_related_patents(
             resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
             if resp.status_code == 200:
                 break
-            logger.debug("Google Patents %s returned %d, trying next kind code", url_pn, resp.status_code)
+            logger.debug(
+                "Google Patents %s returned %d, trying next kind code", url_pn, resp.status_code
+            )
         else:
             logger.warning("No valid Google Patents URL found for %s", patent_number)
             return []
@@ -600,7 +610,9 @@ def _discover_related_patents(
 
         logger.debug(
             "Discovered %d related CN patents from %s (out of %d links)",
-            len(result), patent_number, len(matches),
+            len(result),
+            patent_number,
+            len(matches),
         )
         return result
     except Exception as e:
@@ -639,14 +651,7 @@ def web_search_patents(
     is_cn = (country or "").upper() == "CN"
 
     # Choose engine based on what's working (as of 2026-06-24: Baidu/Google/Startpage blocked)
-    if is_cn:
-        search_params = {
-            "engines": "duckduckgo",
-        }
-    else:
-        search_params = {
-            "engines": "bing",
-        }
+    search_params = {"engines": "duckduckgo"} if is_cn else {"engines": "bing"}
 
     # Build multiple search queries
     cpc_stripped = cpc.replace("/", " ") if cpc else ""
@@ -656,23 +661,25 @@ def web_search_patents(
         if is_cn:
             # DuckDuckGo engine: use English patent queries with CN filter
             base_queries = [
-                f'site:patents.google.com {cpc_quoted} CN',
-                f'{cpc_quoted} CN patent semiconductor packaging',
-                f'{cpc_quoted} 中国专利 芯片封装',
+                f"site:patents.google.com {cpc_quoted} CN",
+                f"{cpc_quoted} CN patent semiconductor packaging",
+                f"{cpc_quoted} 中国专利 芯片封装",
             ]
         else:
             cpc_quoted = f'"{cpc}"'
             base_queries = [
-                f'{cpc_quoted} {country or ""} patent semiconductor'.strip(),
-                f'{cpc_quoted} {country or ""} 专利 封装 芯片'.strip(),
-                f'{cpc_quoted} {country or ""} 半导体 封装'.strip(),
+                f"{cpc_quoted} {country or ''} patent semiconductor".strip(),
+                f"{cpc_quoted} {country or ''} 专利 封装 芯片".strip(),
+                f"{cpc_quoted} {country or ''} 半导体 封装".strip(),
             ]
     else:
-        base_queries = [f'{query or ""} {country or ""} patent'.strip()]
+        base_queries = [f"{query or ''} {country or ''} patent".strip()]
 
     logger.info(
         "Web search fallback: cpc=%s country=%s queries=%d engine=%s",
-        cpc, country, len(base_queries),
+        cpc,
+        country,
+        len(base_queries),
         search_params.get("engines", "all"),
     )
 
@@ -685,8 +692,8 @@ def web_search_patents(
     if is_cn:
         logger.info("CN query — skipping SearXNG, using Firecrawl directly")
         fc_queries = [
-            f'{cpc_stripped} 芯片 封装 中国专利',
-            f'site:patents.google.com/patent/CN {cpc_stripped}',
+            f"{cpc_stripped} 芯片 封装 中国专利",
+            f"site:patents.google.com/patent/CN {cpc_stripped}",
         ]
         for fc_query in fc_queries[:2]:  # 2 queries = 4 credits
             fc_results = _firecrawl_search(fc_query, limit=10)
@@ -722,11 +729,15 @@ def web_search_patents(
                         if url not in seen_urls:
                             seen_urls.add(url)
                             all_results.append(r)
-                    logger.debug("Query %r page %d: %d results", search_query[:50], page, len(page_results))
+                    logger.debug(
+                        "Query %r page %d: %d results", search_query[:50], page, len(page_results)
+                    )
                     if not page_results:  # No more pages
                         break
                 except Exception as e:
-                    logger.warning("SearXNG search failed for %r page %d: %s", search_query[:50], page, e)
+                    logger.warning(
+                        "SearXNG search failed for %r page %d: %s", search_query[:50], page, e
+                    )
 
     logger.info("Total search results: %d", len(all_results))
 
@@ -825,9 +836,7 @@ def web_search_patents(
                 )
             )
         except Exception as e:
-            logger.warning(
-                "Failed to fetch details for %s: %s — using search metadata", pn, e
-            )
+            logger.warning("Failed to fetch details for %s: %s — using search metadata", pn, e)
             meta = pn_meta.get(pn, {})
             enriched.append(
                 PatentBasic(

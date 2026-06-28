@@ -8,10 +8,10 @@ import re
 import requests
 
 from web.google_patents import (
-    _MetaParser,
     GOOGLE_PATENTS_URL,
     HEADERS,
     TIMEOUT,
+    _MetaParser,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ def get_legal_status(publication_number: str) -> dict:
 
     # Extract dates from DC.date
     from datetime import date as dt_date
+
     dates: list[str] = []
     for d in meta.get("DC.date", []):
         try:
@@ -92,9 +93,7 @@ def get_legal_status(publication_number: str) -> dict:
     # Assignee from contributors
     contributors = meta.get("DC.contributor", [])
     assignee = (
-        contributors[-1]
-        if len(contributors) > 1
-        else (contributors[0] if contributors else None)
+        contributors[-1] if len(contributors) > 1 else (contributors[0] if contributors else None)
     )
 
     return {

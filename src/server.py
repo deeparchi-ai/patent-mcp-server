@@ -25,7 +25,6 @@ from mcp.types import (
 from bigquery.client import BigQueryClient, BigQueryCostError, BigQueryError, PatentNotFoundError
 from web.google_patents import bidirectional_citation_graph as web_bidirectional_graph
 from web.google_patents import competitor_citation_matrix as web_competitor_matrix
-from web.google_patents import fetch_cited_by as web_fetch_cited_by
 from web.google_patents import fetch_cited_by_with_details as web_fetch_cited_by_with_details
 from web.google_patents import fetch_claims as web_fetch_claims
 from web.google_patents import fetch_patent as web_fetch_patent
@@ -201,7 +200,7 @@ def create_server(project_id: str) -> Server:
                         "publication_numbers": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "List of patent numbers, e.g. ['CN110286864A', 'CN108668027A']",
+                            "description": "Patent publication numbers (e.g. CN110286864A)",
                         },
                     },
                     "required": ["publication_numbers"],
@@ -221,7 +220,7 @@ def create_server(project_id: str) -> Server:
                         "publication_numbers": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "List of patent numbers, e.g. ['CN110286864A', 'CN108668027A']",
+                            "description": "Patent publication numbers (e.g. CN110286864A)",
                         },
                     },
                     "required": ["publication_numbers"],
@@ -263,12 +262,12 @@ def create_server(project_id: str) -> Server:
                         "publication_numbers": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "List of patent numbers to check, e.g. ['CN110286864A', 'CN108668027A']",
+                            "description": "Patent numbers to check (e.g. CN110286864A)",
                         },
                         "competitor_keywords": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "List of competitor assignee name substrings, e.g. ['百度', 'Baidu', '华为', 'Huawei', 'Apple']",
+                            "description": "Competitor assignee substrings, e.g. 百度, Baidu, 华为",
                         },
                     },
                     "required": ["publication_numbers", "competitor_keywords"],
@@ -278,10 +277,9 @@ def create_server(project_id: str) -> Server:
                 name="bidirectional_citation_graph",
                 description=(
                     "Build full bidirectional citation graph for a company's"
-                    " core patents. Use publication_numbers to specify patents"
-                    " directly (recommended—bypasses JS SPA search issue),"
-                    " or assignee_name for Google Patents search."
-                    " If competitor_keywords provided, also runs"
+                    " core patents. Searches for company's patents on Google"
+                    " Patents, then fetches forward and backward citations for"
+                    " each. If competitor_keywords provided, also runs"
                     " competitor citation matrix. Returns: patents list,"
                     " forward_graph, backward_graph, competitor_matrix."
                 ),
@@ -290,24 +288,20 @@ def create_server(project_id: str) -> Server:
                     "properties": {
                         "assignee_name": {
                             "type": "string",
-                            "description": "Company name for patent search. Not required if publication_numbers given.",
+                            "description": "Company name for patent search, e.g. 'Wuhan Carbit'",
                         },
                         "competitor_keywords": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Optional competitor assignee substrings, e.g. ['百度', '华为']",
+                            "description": "Optional competitor substrings, e.g. 百度, 华为",
                         },
                         "limit": {
                             "type": "integer",
                             "description": "Max patents to analyze (default 10)",
                             "default": 10,
                         },
-                        "publication_numbers": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Optional explicit patent numbers. Bypasses GP search (JS SPA). Preferred when you have patent numbers.",
-                        },
                     },
+                    "required": ["assignee_name"],
                 },
             ),
         ]
@@ -355,9 +349,7 @@ def create_server(project_id: str) -> Server:
                         )
                         if web_results:
                             result = web_results
-                            logger.info(
-                                "Web fallback returned %d results", len(result)
-                            )
+                            logger.info("Web fallback returned %d results", len(result))
 
                 data = [r.model_dump(mode="json") for r in result]
                 return [
@@ -379,7 +371,9 @@ def create_server(project_id: str) -> Server:
                                 r = await client.get_patent(pub_clean)
                                 results.append(r.model_dump(mode="json"))
                             except PatentNotFoundError:
-                                results.append({"publication_number": pub_clean, "error": "not_found"})
+                                results.append(
+                                    {"publication_number": pub_clean, "error": "not_found"}
+                                )
                     except Exception as e:
                         results.append({"publication_number": str(pub), "error": str(e)})
                 return [
@@ -481,9 +475,7 @@ def create_server(project_id: str) -> Server:
             elif name == "get_cited_by":
                 pub = str(arguments["publication_number"])
                 result = await asyncio.to_thread(web_fetch_cited_by_with_details, pub)
-                return [
-                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False))
-                ]
+                return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
 
             elif name == "competitor_citation_matrix":
                 pubs = list(arguments["publication_numbers"])
@@ -494,13 +486,10 @@ def create_server(project_id: str) -> Server:
                 ]
 
             elif name == "bidirectional_citation_graph":
-                assignee = str(arguments.get("assignee_name", ""))
+                assignee = str(arguments["assignee_name"])
                 keywords = list(arguments.get("competitor_keywords", [])) or None
                 limit = min(int(arguments.get("limit", 10)), 20)
-                pub_numbers = list(arguments.get("publication_numbers", [])) or None
-                result = await asyncio.to_thread(
-                    web_bidirectional_graph, assignee, keywords, limit, pub_numbers
-                )
+                result = await asyncio.to_thread(web_bidirectional_graph, assignee, keywords, limit)
                 return [
                     TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
                 ]

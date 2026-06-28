@@ -42,9 +42,7 @@ class TestSearchPatentsValidation:
 
     def test_accepts_assignee_only_without_query(self) -> None:
         """Assignee-only search for company-level patent landscape."""
-        sql, params = BigQueryClient(project_id="test").search_patents_sql(
-            assignee="BOE", limit=5
-        )
+        sql, params = BigQueryClient(project_id="test").search_patents_sql(assignee="BOE", limit=5)
         assert "@assignee" in sql
         assert "REGEXP_CONTAINS" in sql
         assert "assignee_harmonized" in sql

@@ -1,7 +1,5 @@
 """Tests for web.google_patents — regex, normalization, and parsers."""
 
-import pytest
-
 from web.google_patents import (
     PATENT_NUMBER_RE,
     _ClaimParser,
@@ -83,11 +81,11 @@ class TestPatentNumberRegex:
 class TestMetaParser:
     def test_extracts_dc_meta_tags(self):
         html = (
-            '<html><head>'
+            "<html><head>"
             '<meta name="DC.title" content="Test Patent Title">'
             '<meta name="DC.contributor" content="John Doe">'
             '<meta name="DC.contributor" content="ACME Corp">'
-            '</head></html>'
+            "</head></html>"
         )
         parser = _MetaParser()
         parser.feed(html)
@@ -130,7 +128,7 @@ class TestClaimParser:
         assert parser.claims == ["1. A method with nested content."]
 
     def test_no_claims(self):
-        html = '<div>No claims here</div>'
+        html = "<div>No claims here</div>"
         parser = _ClaimParser()
         parser.feed(html)
         assert parser.claims == []

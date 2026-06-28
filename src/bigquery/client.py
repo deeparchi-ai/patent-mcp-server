@@ -39,10 +39,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # ── Cost control thresholds ─────────────────────────────────────────
-SCAN_WARNING_GB = 10     # warn if query scans > 10 GB
-SCAN_REJECT_GB = 50      # reject if query would scan > 50 GB
-SESSION_BUDGET_GB = 500   # reject all queries after session total > 500 GB
-CACHE_TTL_SECONDS = 600   # 10 minutes — memoize identical (sql, params) calls
+SCAN_WARNING_GB = 10  # warn if query scans > 10 GB
+SCAN_REJECT_GB = 50  # reject if query would scan > 50 GB
+SESSION_BUDGET_GB = 500  # reject all queries after session total > 500 GB
+CACHE_TTL_SECONDS = 600  # 10 minutes — memoize identical (sql, params) calls
 SEARCH_DEFAULT_AFTER = "2005-01-01"  # partition filter: last ~21 years
 
 
@@ -327,7 +327,12 @@ class BigQueryClient:
         cached = self._cache_get(key)
         if cached is not None:
             import sys
-            print(f"[CACHE] search_patents: HIT — 0 GB scanned, {len(cached)} results", file=sys.stderr, flush=True)
+
+            print(
+                f"[CACHE] search_patents: HIT — 0 GB scanned, {len(cached)} results",
+                file=sys.stderr,
+                flush=True,
+            )
             return cached
 
         self._check_session_budget()
@@ -348,8 +353,13 @@ class BigQueryClient:
         self._cache_put(key, results)
         logger.info("search_patents scanned %.3f GB, returned %d results", gb, len(results))
         import sys
-        print(f"[COST] search_patents: {gb:.3f} GB scanned, {len(results)} results "
-              f"(session: {self._session_bytes_billed/1e9:.1f}/{SESSION_BUDGET_GB} GB)", file=sys.stderr, flush=True)
+
+        print(
+            f"[COST] search_patents: {gb:.3f} GB scanned, {len(results)} results "
+            f"(session: {self._session_bytes_billed / 1e9:.1f}/{SESSION_BUDGET_GB} GB)",
+            file=sys.stderr,
+            flush=True,
+        )
         return results
 
     async def get_patent(self, publication_number: str) -> PatentDetail:
@@ -360,7 +370,8 @@ class BigQueryClient:
         cached = self._cache_get(key)
         if cached is not None:
             import sys
-            print(f"[CACHE] get_patent: HIT — 0 GB scanned", file=sys.stderr, flush=True)
+
+            print("[CACHE] get_patent: HIT — 0 GB scanned", file=sys.stderr, flush=True)
             return cached
 
         self._check_session_budget()
@@ -377,8 +388,13 @@ class BigQueryClient:
         gb = (job.total_bytes_processed or 0) / 1e9
         self._session_bytes_billed += job.total_bytes_processed or 0
         import sys
-        print(f"[COST] get_patent: {gb:.3f} GB scanned "
-              f"(session: {self._session_bytes_billed/1e9:.1f}/{SESSION_BUDGET_GB} GB)", file=sys.stderr, flush=True)
+
+        print(
+            f"[COST] get_patent: {gb:.3f} GB scanned "
+            f"(session: {self._session_bytes_billed / 1e9:.1f}/{SESSION_BUDGET_GB} GB)",
+            file=sys.stderr,
+            flush=True,
+        )
         if not rows:
             raise PatentNotFoundError(f"Patent not found: {publication_number}")
         result = _build_patent_detail(dict(rows[0]))
@@ -393,7 +409,8 @@ class BigQueryClient:
         cached = self._cache_get(key)
         if cached is not None:
             import sys
-            print(f"[CACHE] get_patent_claims: HIT — 0 GB scanned", file=sys.stderr, flush=True)
+
+            print("[CACHE] get_patent_claims: HIT — 0 GB scanned", file=sys.stderr, flush=True)
             return cached
 
         self._check_session_budget()
@@ -411,8 +428,13 @@ class BigQueryClient:
         self._session_bytes_billed += job.total_bytes_processed or 0
         self._cache_put(key, claims)
         import sys
-        print(f"[COST] get_patent_claims: {gb:.3f} GB scanned "
-              f"(session: {self._session_bytes_billed/1e9:.1f}/{SESSION_BUDGET_GB} GB)", file=sys.stderr, flush=True)
+
+        print(
+            f"[COST] get_patent_claims: {gb:.3f} GB scanned "
+            f"(session: {self._session_bytes_billed / 1e9:.1f}/{SESSION_BUDGET_GB} GB)",
+            file=sys.stderr,
+            flush=True,
+        )
         return claims
 
     async def get_family(self, publication_number: str) -> dict:
@@ -426,7 +448,7 @@ class BigQueryClient:
         detail_sql, detail_params = self.get_patent_sql(publication_number)
         key = self._cache_key(detail_sql, detail_params)
         cached = self._cache_get(key)
-        if cached is not None and hasattr(cached, 'family_id'):
+        if cached is not None and hasattr(cached, "family_id"):
             family_id = cached.family_id
         else:
             self._check_session_budget()
@@ -472,14 +494,16 @@ class BigQueryClient:
         members = []
         for row in family_job.result():
             r = dict(row)
-            members.append({
-                "publication_number": r.get("publication_number", ""),
-                "country_code": r.get("country_code", ""),
-                "kind_code": r.get("kind_code"),
-                "filing_date": str(r["filing_date"]) if r.get("filing_date") else None,
-                "grant_date": str(r["grant_date"]) if r.get("grant_date") else None,
-                "title": r.get("title_zh") or r.get("title_en") or "",
-            })
+            members.append(
+                {
+                    "publication_number": r.get("publication_number", ""),
+                    "country_code": r.get("country_code", ""),
+                    "kind_code": r.get("kind_code"),
+                    "filing_date": str(r["filing_date"]) if r.get("filing_date") else None,
+                    "grant_date": str(r["grant_date"]) if r.get("grant_date") else None,
+                    "title": r.get("title_zh") or r.get("title_en") or "",
+                }
+            )
         gb = (family_job.total_bytes_processed or 0) / 1e9
         self._session_bytes_billed += family_job.total_bytes_processed or 0
         result = {
@@ -490,9 +514,13 @@ class BigQueryClient:
         }
         self._cache_put(family_key, result)
         import sys
-        print(f"[COST] get_family: {gb:.3f} GB scanned — {len(members)} members "
-              f"(session: {self._session_bytes_billed/1e9:.1f}/{SESSION_BUDGET_GB} GB)",
-              file=sys.stderr, flush=True)
+
+        print(
+            f"[COST] get_family: {gb:.3f} GB scanned — {len(members)} members "
+            f"(session: {self._session_bytes_billed / 1e9:.1f}/{SESSION_BUDGET_GB} GB)",
+            file=sys.stderr,
+            flush=True,
+        )
         return result
 
     async def close(self) -> None:

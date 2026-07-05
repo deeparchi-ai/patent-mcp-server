@@ -167,3 +167,16 @@ class TestHardCostCap:
         assert dry and real, "search must issue one dry-run + one real query"
         assert dry[0].maximum_bytes_billed is None
         assert all(c.maximum_bytes_billed == 500 * 10**9 for c in real)
+
+    def test_env_change_after_client_init_takes_effect(self, monkeypatch) -> None:
+        import asyncio
+
+        client, mock_bq = self._client_with_job(rows=[{"text": "claim 1"}])
+        asyncio.run(client.get_patent_claims("US-1-A"))
+        cfg_before = mock_bq.query.call_args.kwargs["job_config"]
+        assert cfg_before.maximum_bytes_billed == 500 * 10**9
+
+        monkeypatch.setenv("PATENT_MCP_MAX_BYTES_BILLED_GB", "42")
+        asyncio.run(client.get_patent_claims("US-2-B"))  # different patent → cache miss
+        cfg_after = mock_bq.query.call_args.kwargs["job_config"]
+        assert cfg_after.maximum_bytes_billed == 42 * 10**9

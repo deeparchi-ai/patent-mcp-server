@@ -13,3 +13,4 @@ dist/
 run.sh
 run-http.sh
 gcp-key.json
+uv.lock

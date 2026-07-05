@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import time
 from datetime import date
 from typing import TYPE_CHECKING
@@ -44,6 +45,13 @@ SCAN_REJECT_GB = 500  # reject if query would scan > 500 GB (match session budge
 SESSION_BUDGET_GB = 500  # reject all queries after session total > 500 GB
 CACHE_TTL_SECONDS = 600  # 10 minutes — memoize identical (sql, params) calls
 SEARCH_DEFAULT_AFTER = "2005-01-01"  # partition filter: last ~21 years
+MAX_BYTES_BILLED_GB_DEFAULT = 500  # engine-side hard cap per query (~$3.1)
+
+
+def _max_bytes_billed() -> int:
+    """Per-query hard cap in bytes. Env-tunable on Cloud Run without a redeploy."""
+    gb = int(os.environ.get("PATENT_MCP_MAX_BYTES_BILLED_GB", str(MAX_BYTES_BILLED_GB_DEFAULT)))
+    return gb * 10**9
 
 
 class BigQueryError(Exception):
@@ -245,6 +253,26 @@ class BigQueryClient:
         if gb > SCAN_WARNING_GB:
             logger.warning("Query will scan %.1f GB — add date filter to reduce cost", gb)
 
+    # ── Real query execution (v2.12) ─────────────────────────────
+
+    def _job_config(self, params: list[ScalarQueryParameter]) -> bigquery.QueryJobConfig:
+        """Config for real (billed) executions: parameterized, cached, hard-capped."""
+        return bigquery.QueryJobConfig(
+            query_parameters=params,
+            use_query_cache=True,
+            maximum_bytes_billed=_max_bytes_billed(),
+        )
+
+    def _execute(
+        self, sql: str, params: list[ScalarQueryParameter]
+    ) -> tuple[Any, list[Any]]:
+        """Run a real query. Single point for the hard cost cap and
+        session bytes accounting; all four tool paths go through here."""
+        job = self.client.query(sql, job_config=self._job_config(params))
+        rows = list(job.result())
+        self._session_bytes_billed += job.total_bytes_processed or 0
+        return job, rows
+
     # ── SQL builders (public for testing) ────────────────────────────
 
     @staticmethod
@@ -338,18 +366,9 @@ class BigQueryClient:
         self._check_session_budget()
         self._check_budget(sql, params)
 
-        job = self.client.query(
-            sql,
-            job_config=bigquery.QueryJobConfig(
-                query_parameters=params,
-                use_query_cache=True,
-            ),
-        )
-        results: list[PatentBasic] = []
-        for row in job.result():
-            results.append(_build_patent_basic(dict(row)))
+        job, rows = self._execute(sql, params)
+        results: list[PatentBasic] = [_build_patent_basic(dict(row)) for row in rows]
         gb = (job.total_bytes_processed or 0) / 1e9
-        self._session_bytes_billed += job.total_bytes_processed or 0
         self._cache_put(key, results)
         logger.info("search_patents scanned %.3f GB, returned %d results", gb, len(results))
         import sys
@@ -377,16 +396,8 @@ class BigQueryClient:
         self._check_session_budget()
         # NOTE: skip _check_budget — publication_number exact match, dry-run overestimates
 
-        job = self.client.query(
-            sql,
-            job_config=bigquery.QueryJobConfig(
-                query_parameters=params,
-                use_query_cache=True,
-            ),
-        )
-        rows = list(job.result())
+        job, rows = self._execute(sql, params)
         gb = (job.total_bytes_processed or 0) / 1e9
-        self._session_bytes_billed += job.total_bytes_processed or 0
         import sys
 
         print(
@@ -416,16 +427,9 @@ class BigQueryClient:
         self._check_session_budget()
         # NOTE: skip _check_budget — publication_number exact match, dry-run overestimates
 
-        job = self.client.query(
-            sql,
-            job_config=bigquery.QueryJobConfig(
-                query_parameters=params,
-                use_query_cache=True,
-            ),
-        )
-        claims = [str(row["text"]) for row in job.result()]
+        job, rows = self._execute(sql, params)
+        claims = [str(row["text"]) for row in rows]
         gb = (job.total_bytes_processed or 0) / 1e9
-        self._session_bytes_billed += job.total_bytes_processed or 0
         self._cache_put(key, claims)
         import sys
 
@@ -452,16 +456,8 @@ class BigQueryClient:
             family_id = cached.family_id
         else:
             self._check_session_budget()
-            job = self.client.query(
-                detail_sql,
-                job_config=bigquery.QueryJobConfig(
-                    query_parameters=detail_params,
-                    use_query_cache=True,
-                ),
-            )
-            rows = list(job.result())
+            job, rows = self._execute(detail_sql, detail_params)
             gb = (job.total_bytes_processed or 0) / 1e9
-            self._session_bytes_billed += job.total_bytes_processed or 0
             import sys
 
             print(
@@ -493,15 +489,9 @@ class BigQueryClient:
             return family_cached  # type: ignore[no-any-return]
 
         self._check_session_budget()
-        family_job = self.client.query(
-            family_sql,
-            job_config=bigquery.QueryJobConfig(
-                query_parameters=family_params,
-                use_query_cache=True,
-            ),
-        )
+        family_job, family_rows = self._execute(family_sql, family_params)
         members = []
-        for row in family_job.result():
+        for row in family_rows:
             r = dict(row)
             members.append(
                 {
@@ -514,7 +504,6 @@ class BigQueryClient:
                 }
             )
         gb = (family_job.total_bytes_processed or 0) / 1e9
-        self._session_bytes_billed += family_job.total_bytes_processed or 0
         result = {
             "publication_number": publication_number,
             "family_id": family_id,

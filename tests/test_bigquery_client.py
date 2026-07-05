@@ -120,3 +120,50 @@ class TestCostLogging:
         err = capsys.readouterr().err
         assert "[COST] get_family lookup: 5.000 GB scanned" in err
         assert result["publication_number"] == "US-1-A"
+
+
+class TestHardCostCap:
+    """v2.12: every real execution carries maximum_bytes_billed; dry-run must not."""
+
+    def _client_with_job(self, rows=None, bytes_processed=0):
+        from unittest.mock import MagicMock
+
+        client = BigQueryClient(project_id="test-project")
+        mock_bq = MagicMock()
+        client._client = mock_bq
+        job = MagicMock()
+        job.result.return_value = rows if rows is not None else []
+        job.total_bytes_processed = bytes_processed
+        mock_bq.query.return_value = job
+        return client, mock_bq
+
+    def test_get_patent_claims_config_has_max_bytes_billed(self) -> None:
+        import asyncio
+
+        client, mock_bq = self._client_with_job(rows=[{"text": "claim 1"}])
+        asyncio.run(client.get_patent_claims("US-1-A"))
+        cfg = mock_bq.query.call_args.kwargs["job_config"]
+        assert cfg.maximum_bytes_billed == 500 * 10**9
+
+    def test_env_override_changes_cap(self, monkeypatch) -> None:
+        import asyncio
+
+        monkeypatch.setenv("PATENT_MCP_MAX_BYTES_BILLED_GB", "100")
+        client, mock_bq = self._client_with_job(rows=[{"text": "claim 1"}])
+        asyncio.run(client.get_patent_claims("US-1-A"))
+        cfg = mock_bq.query.call_args.kwargs["job_config"]
+        assert cfg.maximum_bytes_billed == 100 * 10**9
+
+    def test_search_dry_run_has_no_cap_but_real_call_does(self) -> None:
+        import asyncio
+
+        client, mock_bq = self._client_with_job()
+        asyncio.run(
+            client.search_patents(query="agent", country="US")
+        )
+        configs = [c.kwargs["job_config"] for c in mock_bq.query.call_args_list]
+        dry = [c for c in configs if getattr(c, "dry_run", False)]
+        real = [c for c in configs if not getattr(c, "dry_run", False)]
+        assert dry and real, "search must issue one dry-run + one real query"
+        assert dry[0].maximum_bytes_billed is None
+        assert all(c.maximum_bytes_billed == 500 * 10**9 for c in real)

@@ -47,6 +47,64 @@ _AGENT_CARD_JSON = json.dumps({
         "Patent family and citation network analysis",
         "IP due diligence for M&A, investment, or licensing",
     ],
+    # ── Agent auto-discovery signals ──────────────────────────────────
+    # Triggers: keywords and intents an AI agent uses to match this server
+    # to user tasks without requiring a human to configure it.
+    "triggers": {
+        "keywords": [
+            "patent", "专利", "IP", "intellectual property", "知识产权",
+            "prior art", "现有技术", "FTO", "freedom to operate",
+            "patent landscape", "专利布局", "patent portfolio",
+            "patent citation", "专利引用", "patent family", "同族专利",
+            "legal status", "法律状态", "claims", "权利要求",
+            "competitor patent", "竞争专利", "patent analysis",
+        ],
+        "intents": [
+            "patent_search",
+            "patent_analysis",
+            "competitor_intelligence",
+            "ip_due_diligence",
+            "technology_landscape",
+        ],
+        "user_roles": [
+            "patent_attorney", "ip_manager", "legal_counsel",
+            "r_and_d_engineer", "investment_analyst", "m_and_a_advisor",
+        ],
+    },
+    # Capabilities: structured snapshot of what this server can do.
+    # Agents use this to decide whether it fits the current task.
+    "capabilities": {
+        "search": {
+            "scope": "global",
+            "coverage": "140M+ patents",
+            "jurisdictions": ["CN", "US", "EP", "JP", "KR", "WO"],
+            "modes": ["keyword", "assignee", "CPC", "date_range"],
+        },
+        "detail": [
+            "title", "abstract", "claims", "classifications",
+            "citations", "inventors", "assignees", "family_id",
+            "filing_date", "grant_date", "priority_date",
+        ],
+        "analysis": [
+            "citation_graph", "competitor_matrix",
+            "family_analysis", "legal_status_tracking",
+        ],
+    },
+    # Performance: helps an agent set user expectations before calling.
+    "performance": {
+        "typical_latency_ms": 2000,
+        "worst_latency_ms": 15000,
+        "concurrent_limit": 10,
+        "monthly_quota": "1 TB BigQuery sandbox",
+    },
+    # Interop: MCP protocol compatibility signals.
+    "interop": {
+        "mcp_version": "2024-11-05",
+        "transport": ["sse"],
+        "requires": [],
+        "conflicts_with": [],
+    },
+    # ── Standard fields (existing) ────────────────────────────────────
     "mcp_config": {
         "transport": "sse",
         "url": "https://patent-mcp-494814528402.us-central1.run.app/sse/",
@@ -69,7 +127,7 @@ _AGENT_CARD_JSON = json.dumps({
         "No authentication required — public data only",
     ],
     "protocol": "MCP (Model Context Protocol) over SSE",
-    "version": "1.8.0",
+    "version": "1.9.0",
 })
 from web.google_patents import web_search_patents
 from web.legal_status import get_legal_status as web_get_legal_status

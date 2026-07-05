@@ -2,7 +2,7 @@
 
 import pytest
 
-from bigquery.client import BigQueryClient, BigQueryError, PatentNotFoundError
+from bigquery.client import BigQueryClient, BigQueryCostError, BigQueryError, PatentNotFoundError
 
 
 class TestBigQueryClientInit:
@@ -193,3 +193,48 @@ class TestHardCostCap:
         second = mock_bq.query.call_args.kwargs["job_config"].maximum_bytes_billed
         assert first == 500 * 10**9
         assert second == 7 * 10**9
+
+
+
+class TestCostErrorMapping:
+    """v2.12: engine-side cost kills surface as BigQueryCostError, not raw API errors."""
+
+    def _client_raising(self, exc):
+        from unittest.mock import MagicMock
+
+        client = BigQueryClient(project_id="test-project")
+        mock_bq = MagicMock()
+        client._client = mock_bq
+        mock_bq.query.side_effect = exc
+        return client
+
+    def test_bytes_billed_limit_maps_to_cost_error(self) -> None:
+        import asyncio
+
+        from google.api_core.exceptions import BadRequest
+
+        client = self._client_raising(
+            BadRequest("Query exceeded limit for bytes billed: 500000000000")
+        )
+        with pytest.raises(BigQueryCostError):
+            asyncio.run(client.get_patent("US-1-A"))
+
+    def test_custom_quota_maps_to_cost_error(self) -> None:
+        import asyncio
+
+        from google.api_core.exceptions import Forbidden
+
+        client = self._client_raising(
+            Forbidden("quotaExceeded: Custom quota exceeded for query/usage per day")
+        )
+        with pytest.raises(BigQueryCostError):
+            asyncio.run(client.get_patent_claims("US-1-A"))
+
+    def test_unrelated_badrequest_passes_through(self) -> None:
+        import asyncio
+
+        from google.api_core.exceptions import BadRequest
+
+        client = self._client_raising(BadRequest("Syntax error at [1:10]"))
+        with pytest.raises(BadRequest):
+            asyncio.run(client.get_patent("US-1-A"))

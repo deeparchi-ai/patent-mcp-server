@@ -18,6 +18,7 @@ import time
 from datetime import date
 from typing import TYPE_CHECKING
 
+from google.api_core import exceptions as google_exceptions
 from google.cloud import bigquery
 from google.cloud.bigquery import ScalarQueryParameter
 
@@ -64,6 +65,20 @@ class PatentNotFoundError(BigQueryError):
 
 class BigQueryCostError(BigQueryError):
     """Query would scan too much data — rejected by budget guard."""
+
+_COST_ERROR_MARKERS = (
+    "bytesBilledLimitExceeded",
+    "bytes billed",  # "Query exceeded limit for bytes billed: N"
+    "quotaExceeded",  # project-level custom quota (daily)
+    "Custom quota",
+)
+
+
+def _map_cost_error(e: Exception) -> None:
+    """Re-raise engine-side cost/quota kills as BigQueryCostError; else return."""
+    msg = str(e)
+    if any(marker in msg for marker in _COST_ERROR_MARKERS):
+        raise BigQueryCostError(f"BigQuery hard cost limit: {msg.splitlines()[0]}") from e
 
 
 def _int_to_date(value: int | None) -> date | None:
@@ -268,8 +283,12 @@ class BigQueryClient:
     ) -> tuple[Any, list[Any]]:
         """Run a real query. Single point for the hard cost cap and
         session bytes accounting; all four tool paths go through here."""
-        job = self.client.query(sql, job_config=self._job_config(params))
-        rows = list(job.result())
+        try:
+            job = self.client.query(sql, job_config=self._job_config(params))
+            rows = list(job.result())
+        except google_exceptions.GoogleAPICallError as e:
+            _map_cost_error(e)
+            raise
         self._session_bytes_billed += job.total_bytes_processed or 0
         return job, rows
 

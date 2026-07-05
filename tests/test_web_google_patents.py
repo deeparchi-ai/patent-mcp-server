@@ -38,7 +38,9 @@ class TestPatentNumberRegex:
         assert m.group(1) == "CN107452705A"
 
     def test_google_patents_url_with_dash(self):
-        m = PATENT_NUMBER_RE.search("https://patents.google.com/patent/US-7650331-B1/en")
+        m = PATENT_NUMBER_RE.search(
+            "https://patents.google.com/patent/US-7650331-B1/en"
+        )
         assert m is not None
         # Regex captures up to the numbers, kind code after second dash is separate
         assert "7650331" in m.group(1)

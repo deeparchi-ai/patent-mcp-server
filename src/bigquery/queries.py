@@ -54,7 +54,9 @@ def search_patents_query(
             "EXISTS (SELECT 1 FROM UNNEST(assignee_harmonized) "
             "WHERE REGEXP_CONTAINS(LOWER(name), @assignee))"
         )
-        params.append(ScalarQueryParameter("assignee", "STRING", f"(^| ){escaped}( |$)"))
+        params.append(
+            ScalarQueryParameter("assignee", "STRING", f"(^| ){escaped}( |$)")
+        )
 
     # Country filter
     if country:
@@ -69,10 +71,14 @@ def search_patents_query(
     # Date range
     if after:
         conditions.append("filing_date >= @after")
-        params.append(ScalarQueryParameter("after", "INT64", int(after.replace("-", ""))))
+        params.append(
+            ScalarQueryParameter("after", "INT64", int(after.replace("-", "")))
+        )
     if before:
         conditions.append("filing_date <= @before")
-        params.append(ScalarQueryParameter("before", "INT64", int(before.replace("-", ""))))
+        params.append(
+            ScalarQueryParameter("before", "INT64", int(before.replace("-", "")))
+        )
 
     # Status filter
     if status:
@@ -154,7 +160,9 @@ def get_patent_query(publication_number: str) -> tuple[str, list[ScalarQueryPara
     return sql, params
 
 
-def get_patent_claims_query(publication_number: str) -> tuple[str, list[ScalarQueryParameter]]:
+def get_patent_claims_query(
+    publication_number: str,
+) -> tuple[str, list[ScalarQueryParameter]]:
     """Build query for US patent claims via patentsview."""
     parts = publication_number.split("-")
     if len(parts) < 2:

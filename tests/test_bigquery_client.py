@@ -2,7 +2,12 @@
 
 import pytest
 
-from bigquery.client import BigQueryClient, BigQueryCostError, BigQueryError, PatentNotFoundError
+from bigquery.client import (
+    BigQueryClient,
+    BigQueryCostError,
+    BigQueryError,
+    PatentNotFoundError,
+)
 
 
 class TestBigQueryClientInit:
@@ -42,7 +47,9 @@ class TestSearchPatentsValidation:
 
     def test_accepts_assignee_only_without_query(self) -> None:
         """Assignee-only search for company-level patent landscape."""
-        sql, params = BigQueryClient(project_id="test").search_patents_sql(assignee="BOE", limit=5)
+        sql, params = BigQueryClient(project_id="test").search_patents_sql(
+            assignee="BOE", limit=5
+        )
         assert "@assignee" in sql
         assert "REGEXP_CONTAINS" in sql
         assert "assignee_harmonized" in sql
@@ -67,7 +74,9 @@ class TestSearchPatentsValidation:
 
     def test_accepts_country_only_without_query(self) -> None:
         """Country-only search should work (landscape browsing)."""
-        sql, params = BigQueryClient(project_id="test").search_patents_sql(country="CN", limit=5)
+        sql, params = BigQueryClient(project_id="test").search_patents_sql(
+            country="CN", limit=5
+        )
         assert "country_code" in sql
         assert "LIMIT" in sql
 
@@ -158,9 +167,7 @@ class TestHardCostCap:
         import asyncio
 
         client, mock_bq = self._client_with_job()
-        asyncio.run(
-            client.search_patents(query="agent", country="US")
-        )
+        asyncio.run(client.search_patents(query="agent", country="US"))
         configs = [c.kwargs["job_config"] for c in mock_bq.query.call_args_list]
         dry = [c for c in configs if getattr(c, "dry_run", False)]
         real = [c for c in configs if not getattr(c, "dry_run", False)]
@@ -193,7 +200,6 @@ class TestHardCostCap:
         second = mock_bq.query.call_args.kwargs["job_config"].maximum_bytes_billed
         assert first == 500 * 10**9
         assert second == 7 * 10**9
-
 
 
 class TestCostErrorMapping:

@@ -51,7 +51,11 @@ MAX_BYTES_BILLED_GB_DEFAULT = 500  # engine-side hard cap per query (~$3.1)
 
 def _max_bytes_billed() -> int:
     """Per-query hard cap in bytes. Env-tunable on Cloud Run without a redeploy."""
-    gb = int(os.environ.get("PATENT_MCP_MAX_BYTES_BILLED_GB", str(MAX_BYTES_BILLED_GB_DEFAULT)))
+    gb = int(
+        os.environ.get(
+            "PATENT_MCP_MAX_BYTES_BILLED_GB", str(MAX_BYTES_BILLED_GB_DEFAULT)
+        )
+    )
     return gb * 10**9
 
 
@@ -66,6 +70,7 @@ class PatentNotFoundError(BigQueryError):
 class BigQueryCostError(BigQueryError):
     """Query would scan too much data — rejected by budget guard."""
 
+
 _COST_ERROR_MARKERS = (
     "bytesBilledLimitExceeded",
     "bytes billed",  # "Query exceeded limit for bytes billed: N"
@@ -78,7 +83,9 @@ def _map_cost_error(e: Exception) -> None:
     """Re-raise engine-side cost/quota kills as BigQueryCostError; else return."""
     msg = str(e)
     if any(marker in msg for marker in _COST_ERROR_MARKERS):
-        raise BigQueryCostError(f"BigQuery hard cost limit: {msg.splitlines()[0]}") from e
+        raise BigQueryCostError(
+            f"BigQuery hard cost limit: {msg.splitlines()[0]}"
+        ) from e
 
 
 def _int_to_date(value: int | None) -> date | None:
@@ -192,7 +199,9 @@ class BigQueryClient:
         self.project_id = project_id
         self._client: bigquery.Client | None = None
         # ── v1.7.0: cache + budget ────────────────────────────────
-        self._query_cache: dict[str, tuple[float, Any]] = {}  # key → (timestamp, result)
+        self._query_cache: dict[str, tuple[float, Any]] = (
+            {}
+        )  # key → (timestamp, result)
         self._session_bytes_billed: int = 0
 
     @property
@@ -266,11 +275,15 @@ class BigQueryClient:
                 f"(max {SCAN_REJECT_GB} GB). Add filters (after/country/cpc)."
             )
         if gb > SCAN_WARNING_GB:
-            logger.warning("Query will scan %.1f GB — add date filter to reduce cost", gb)
+            logger.warning(
+                "Query will scan %.1f GB — add date filter to reduce cost", gb
+            )
 
     # ── Real query execution (v2.12) ─────────────────────────────
 
-    def _job_config(self, params: list[ScalarQueryParameter]) -> bigquery.QueryJobConfig:
+    def _job_config(
+        self, params: list[ScalarQueryParameter]
+    ) -> bigquery.QueryJobConfig:
         """Config for real (billed) executions: parameterized, cached, hard-capped."""
         return bigquery.QueryJobConfig(
             query_parameters=params,
@@ -327,7 +340,9 @@ class BigQueryClient:
         )
 
     @staticmethod
-    def get_patent_sql(publication_number: str) -> tuple[str, list[ScalarQueryParameter]]:
+    def get_patent_sql(
+        publication_number: str,
+    ) -> tuple[str, list[ScalarQueryParameter]]:
         return get_patent_query(publication_number)  # type: ignore[no-any-return]
 
     @staticmethod
@@ -389,7 +404,9 @@ class BigQueryClient:
         results: list[PatentBasic] = [_build_patent_basic(dict(row)) for row in rows]
         gb = (job.total_bytes_processed or 0) / 1e9
         self._cache_put(key, results)
-        logger.info("search_patents scanned %.3f GB, returned %d results", gb, len(results))
+        logger.info(
+            "search_patents scanned %.3f GB, returned %d results", gb, len(results)
+        )
         import sys
 
         print(
@@ -440,7 +457,11 @@ class BigQueryClient:
         if cached is not None:
             import sys
 
-            print("[CACHE] get_patent_claims: HIT — 0 GB scanned", file=sys.stderr, flush=True)
+            print(
+                "[CACHE] get_patent_claims: HIT — 0 GB scanned",
+                file=sys.stderr,
+                flush=True,
+            )
             return cached  # type: ignore[no-any-return]
 
         self._check_session_budget()
@@ -517,7 +538,9 @@ class BigQueryClient:
                     "publication_number": r.get("publication_number", ""),
                     "country_code": r.get("country_code", ""),
                     "kind_code": r.get("kind_code"),
-                    "filing_date": str(r["filing_date"]) if r.get("filing_date") else None,
+                    "filing_date": (
+                        str(r["filing_date"]) if r.get("filing_date") else None
+                    ),
                     "grant_date": str(r["grant_date"]) if r.get("grant_date") else None,
                     "title": r.get("title_zh") or r.get("title_en") or "",
                 }

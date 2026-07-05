@@ -94,7 +94,9 @@ def get_legal_status(publication_number: str) -> dict[str, Any]:
     # Assignee from contributors
     contributors = meta.get("DC.contributor", [])
     assignee = (
-        contributors[-1] if len(contributors) > 1 else (contributors[0] if contributors else None)
+        contributors[-1]
+        if len(contributors) > 1
+        else (contributors[0] if contributors else None)
     )
 
     return {

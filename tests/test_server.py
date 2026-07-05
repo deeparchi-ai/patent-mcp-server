@@ -47,9 +47,7 @@ class TestToolRegistration:
 
             server = create_server("test-project")
             fn = server.request_handlers[ListToolsRequest]
-            result = asyncio.run(
-                fn(ListToolsRequest(method="tools/list", params=None))
-            )
+            result = asyncio.run(fn(ListToolsRequest(method="tools/list", params=None)))
             names = [t.name for t in result.root.tools]
             assert "search_patents" in names
             assert "get_patent" in names
@@ -70,9 +68,7 @@ class TestSearchPatentsHandler:
             server = create_server("test-project")
 
             fn = server.request_handlers[CallToolRequest]
-            result = asyncio.run(
-                fn(_make_call_req("search_patents", {"query": "AI"}))
-            )
+            result = asyncio.run(fn(_make_call_req("search_patents", {"query": "AI"})))
             assert "invalid_input" in result.root.content[0].text
 
     def test_accepts_country_filter(self) -> None:
@@ -134,15 +130,16 @@ class TestGetPatentHandler:
             server = create_server("test-project")
 
             fn = server.request_handlers[CallToolRequest]
-            result = asyncio.run(
-                fn(_make_call_req("nonexistent_tool", {}))
-            )
+            result = asyncio.run(fn(_make_call_req("nonexistent_tool", {})))
             assert "Unknown tool" in result.root.content[0].text
 
 
 class TestServerErrorHandling:
     def test_missing_gcp_project_id(self) -> None:
-        with pytest.raises(ValueError), patch("bigquery.client.bigquery.Client", MagicMock()):
+        with (
+            pytest.raises(ValueError),
+            patch("bigquery.client.bigquery.Client", MagicMock()),
+        ):
             from server import create_server
 
             create_server("")
@@ -155,16 +152,16 @@ class TestCostLimitSemantics:
         with (
             patch("server.BigQueryClient") as mock_cls,
             patch("bigquery.client.bigquery.Client", MagicMock()),
-            patch("server.web_search_patents", MagicMock(return_value=web_results or [])),
+            patch(
+                "server.web_search_patents", MagicMock(return_value=web_results or [])
+            ),
         ):
             mock_cls.return_value = mock_client
             from server import create_server
 
             server = create_server("test-project")
             fn = server.request_handlers[CallToolRequest]
-            return asyncio.run(
-                fn(_make_call_req("search_patents", args))
-            )
+            return asyncio.run(fn(_make_call_req("search_patents", args)))
 
     def test_search_cost_blocked_no_fallback_returns_cost_limit(self) -> None:
         from bigquery.client import BigQueryCostError
@@ -173,7 +170,9 @@ class TestCostLimitSemantics:
         mock_client.search_patents.side_effect = BigQueryCostError(
             "Session budget exhausted: 513.3 GB used"
         )
-        result = self._run_search(mock_client, {"query": "neural network", "country": "US"})
+        result = self._run_search(
+            mock_client, {"query": "neural network", "country": "US"}
+        )
         text = result.root.content[0].text
         assert "cost_limit" in text
         assert "Session budget exhausted" in text
@@ -186,7 +185,9 @@ class TestCostLimitSemantics:
             "Session budget exhausted: 513.3 GB used"
         )
         result = self._run_search(
-            mock_client, {"query": "chip", "cpc": "H01L", "country": "CN"}, web_results=[]
+            mock_client,
+            {"query": "chip", "cpc": "H01L", "country": "CN"},
+            web_results=[],
         )
         text = result.root.content[0].text
         assert "cost_limit" in text
@@ -199,7 +200,9 @@ class TestCostLimitSemantics:
         web_hit = MagicMock()
         web_hit.model_dump.return_value = {"publication_number": "CN-118888888-A"}
         result = self._run_search(
-            mock_client, {"query": "chip", "cpc": "H01L", "country": "CN"}, web_results=[web_hit]
+            mock_client,
+            {"query": "chip", "cpc": "H01L", "country": "CN"},
+            web_results=[web_hit],
         )
         text = result.root.content[0].text
         assert "cost_limit" not in text
@@ -209,11 +212,15 @@ class TestCostLimitSemantics:
         from bigquery.client import BigQueryCostError
 
         mock_client = AsyncMock()
-        mock_client.get_patent.side_effect = BigQueryCostError("Session budget exhausted")
+        mock_client.get_patent.side_effect = BigQueryCostError(
+            "Session budget exhausted"
+        )
         with (
             patch("server.BigQueryClient") as mock_cls,
             patch("bigquery.client.bigquery.Client", MagicMock()),
-            patch("server.web_fetch_patent", MagicMock(side_effect=Exception("web down"))),
+            patch(
+                "server.web_fetch_patent", MagicMock(side_effect=Exception("web down"))
+            ),
         ):
             mock_cls.return_value = mock_client
             from server import create_server
@@ -221,7 +228,11 @@ class TestCostLimitSemantics:
             server = create_server("test-project")
             fn = server.request_handlers[CallToolRequest]
             result = asyncio.run(
-                fn(_make_call_req("batch_get_patents", {"publication_numbers": ["US-1-A"]}))
+                fn(
+                    _make_call_req(
+                        "batch_get_patents", {"publication_numbers": ["US-1-A"]}
+                    )
+                )
             )
         text = result.root.content[0].text
         assert "cost_limit" in text

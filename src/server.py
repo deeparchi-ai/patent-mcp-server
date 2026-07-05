@@ -22,10 +22,17 @@ from mcp.types import (
     Tool,
 )
 
-from bigquery.client import BigQueryClient, BigQueryCostError, BigQueryError, PatentNotFoundError
+from bigquery.client import (
+    BigQueryClient,
+    BigQueryCostError,
+    BigQueryError,
+    PatentNotFoundError,
+)
 from web.google_patents import bidirectional_citation_graph as web_bidirectional_graph
 from web.google_patents import competitor_citation_matrix as web_competitor_matrix
-from web.google_patents import fetch_cited_by_with_details as web_fetch_cited_by_with_details
+from web.google_patents import (
+    fetch_cited_by_with_details as web_fetch_cited_by_with_details,
+)
 from web.google_patents import fetch_claims as web_fetch_claims
 from web.google_patents import fetch_patent as web_fetch_patent
 from web.google_patents import web_search_patents
@@ -34,103 +41,136 @@ from web.legal_status import get_legal_status as web_get_legal_status
 # ── Agent Card — machine-readable MCP server description ──────────────────────
 # Used by AI agents to auto-discover, evaluate, and configure this server.
 # Served at /.well-known/agent-card.json
-_AGENT_CARD_JSON = json.dumps({
-    "name": "Patent MCP Server",
-    "description": (
-        "Search and analyze 140M+ global patents via Google Patents BigQuery. "
-        "For patent landscape analysis, competitor portfolio tracking, prior art "
-        "search, and IP due diligence. 10 tools: search, detail lookup, claims, "
-        "legal status, family, citations, competitor matrix, citation graph."
-    ),
-    "use_cases": [
-        "Competitor patent portfolio analysis and tracking",
-        "Technology landscape mapping and trend analysis",
-        "Prior art search for patent applications",
-        "Patent family and citation network analysis",
-        "IP due diligence for M&A, investment, or licensing",
-    ],
-    # ── Agent auto-discovery signals ──────────────────────────────────
-    # Triggers: keywords and intents an AI agent uses to match this server
-    # to user tasks without requiring a human to configure it.
-    "triggers": {
-        "keywords": [
-            "patent", "专利", "IP", "intellectual property", "知识产权",
-            "prior art", "现有技术", "FTO", "freedom to operate",
-            "patent landscape", "专利布局", "patent portfolio",
-            "patent citation", "专利引用", "patent family", "同族专利",
-            "legal status", "法律状态", "claims", "权利要求",
-            "competitor patent", "竞争专利", "patent analysis",
+_AGENT_CARD_JSON = json.dumps(
+    {
+        "name": "Patent MCP Server",
+        "description": (
+            "Search and analyze 140M+ global patents via Google Patents BigQuery. "
+            "For patent landscape analysis, competitor portfolio tracking, prior art "
+            "search, and IP due diligence. 10 tools: search, detail lookup, claims, "
+            "legal status, family, citations, competitor matrix, citation graph."
+        ),
+        "use_cases": [
+            "Competitor patent portfolio analysis and tracking",
+            "Technology landscape mapping and trend analysis",
+            "Prior art search for patent applications",
+            "Patent family and citation network analysis",
+            "IP due diligence for M&A, investment, or licensing",
         ],
-        "intents": [
-            "patent_search",
-            "patent_analysis",
-            "competitor_intelligence",
-            "ip_due_diligence",
-            "technology_landscape",
-        ],
-        "user_roles": [
-            "patent_attorney", "ip_manager", "legal_counsel",
-            "r_and_d_engineer", "investment_analyst", "m_and_a_advisor",
-        ],
-    },
-    # Capabilities: structured snapshot of what this server can do.
-    # Agents use this to decide whether it fits the current task.
-    "capabilities": {
-        "search": {
-            "scope": "global",
-            "coverage": "140M+ patents",
-            "jurisdictions": ["CN", "US", "EP", "JP", "KR", "WO"],
-            "modes": ["keyword", "assignee", "CPC", "date_range"],
+        # ── Agent auto-discovery signals ──────────────────────────────────
+        # Triggers: keywords and intents an AI agent uses to match this server
+        # to user tasks without requiring a human to configure it.
+        "triggers": {
+            "keywords": [
+                "patent",
+                "专利",
+                "IP",
+                "intellectual property",
+                "知识产权",
+                "prior art",
+                "现有技术",
+                "FTO",
+                "freedom to operate",
+                "patent landscape",
+                "专利布局",
+                "patent portfolio",
+                "patent citation",
+                "专利引用",
+                "patent family",
+                "同族专利",
+                "legal status",
+                "法律状态",
+                "claims",
+                "权利要求",
+                "competitor patent",
+                "竞争专利",
+                "patent analysis",
+            ],
+            "intents": [
+                "patent_search",
+                "patent_analysis",
+                "competitor_intelligence",
+                "ip_due_diligence",
+                "technology_landscape",
+            ],
+            "user_roles": [
+                "patent_attorney",
+                "ip_manager",
+                "legal_counsel",
+                "r_and_d_engineer",
+                "investment_analyst",
+                "m_and_a_advisor",
+            ],
         },
-        "detail": [
-            "title", "abstract", "claims", "classifications",
-            "citations", "inventors", "assignees", "family_id",
-            "filing_date", "grant_date", "priority_date",
+        # Capabilities: structured snapshot of what this server can do.
+        # Agents use this to decide whether it fits the current task.
+        "capabilities": {
+            "search": {
+                "scope": "global",
+                "coverage": "140M+ patents",
+                "jurisdictions": ["CN", "US", "EP", "JP", "KR", "WO"],
+                "modes": ["keyword", "assignee", "CPC", "date_range"],
+            },
+            "detail": [
+                "title",
+                "abstract",
+                "claims",
+                "classifications",
+                "citations",
+                "inventors",
+                "assignees",
+                "family_id",
+                "filing_date",
+                "grant_date",
+                "priority_date",
+            ],
+            "analysis": [
+                "citation_graph",
+                "competitor_matrix",
+                "family_analysis",
+                "legal_status_tracking",
+            ],
+        },
+        # Performance: helps an agent set user expectations before calling.
+        "performance": {
+            "typical_latency_ms": 2000,
+            "worst_latency_ms": 15000,
+            "concurrent_limit": 10,
+            "monthly_quota": "1 TB BigQuery sandbox",
+        },
+        # Interop: MCP protocol compatibility signals.
+        "interop": {
+            "mcp_version": "2024-11-05",
+            "transport": ["sse"],
+            "requires": [],
+            "conflicts_with": [],
+        },
+        # ── Standard fields (existing) ────────────────────────────────────
+        "mcp_config": {
+            "transport": "sse",
+            "url": "https://patent-mcp-494814528402.us-central1.run.app/sse/",
+        },
+        "auth": "none",
+        "pricing": "free",
+        "data_sources": [
+            "Google Patents Public Datasets (BigQuery) — full-text search",
+            "Google Patents web pages — real-time legal status",
         ],
-        "analysis": [
-            "citation_graph", "competitor_matrix",
-            "family_analysis", "legal_status_tracking",
+        "maintainer": {
+            "name": "DeepArchi",
+            "github": "https://github.com/deeparchi-ai/patent-mcp-server",
+        },
+        "tools": 10,
+        "limitations": [
+            "BigQuery sandbox: 1 TB/month free, then throttled",
+            "Hosted in us-central1, ~200ms latency from Asia-Pacific",
+            "Google Patents web scraping subject to rate limits (retry with backoff)",
+            "No authentication required — public data only",
         ],
-    },
-    # Performance: helps an agent set user expectations before calling.
-    "performance": {
-        "typical_latency_ms": 2000,
-        "worst_latency_ms": 15000,
-        "concurrent_limit": 10,
-        "monthly_quota": "1 TB BigQuery sandbox",
-    },
-    # Interop: MCP protocol compatibility signals.
-    "interop": {
-        "mcp_version": "2024-11-05",
-        "transport": ["sse"],
-        "requires": [],
-        "conflicts_with": [],
-    },
-    # ── Standard fields (existing) ────────────────────────────────────
-    "mcp_config": {
-        "transport": "sse",
-        "url": "https://patent-mcp-494814528402.us-central1.run.app/sse/",
-    },
-    "auth": "none",
-    "pricing": "free",
-    "data_sources": [
-        "Google Patents Public Datasets (BigQuery) — full-text search",
-        "Google Patents web pages — real-time legal status",
-    ],
-    "maintainer": {
-        "name": "DeepArchi",
-        "github": "https://github.com/deeparchi-ai/patent-mcp-server",
-    },
-    "tools": 10,
-    "limitations": [
-        "BigQuery sandbox: 1 TB/month free, then throttled",
-        "Hosted in us-central1, ~200ms latency from Asia-Pacific",
-        "Google Patents web scraping subject to rate limits (retry with backoff)",
-        "No authentication required — public data only",
-    ],
-    "protocol": "MCP (Model Context Protocol) over SSE",
-    "version": "1.9.0",
-})
+        "protocol": "MCP (Model Context Protocol) over SSE",
+        "version": "1.9.0",
+    }
+)
 
 logger = logging.getLogger("patent-mcp-server")
 
@@ -468,7 +508,9 @@ def create_server(project_id: str) -> Server:
 
                 data = [r.model_dump(mode="json") for r in result]
                 return [
-                    TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))
+                    TextContent(
+                        type="text", text=json.dumps(data, ensure_ascii=False, indent=2)
+                    )
                 ]
 
             elif name == "batch_get_patents":
@@ -487,7 +529,10 @@ def create_server(project_id: str) -> Server:
                                 results.append(r.model_dump(mode="json"))
                             except PatentNotFoundError:
                                 results.append(
-                                    {"publication_number": pub_clean, "error": "not_found"}
+                                    {
+                                        "publication_number": pub_clean,
+                                        "error": "not_found",
+                                    }
                                 )
                     except BigQueryCostError as e:
                         results.append(
@@ -498,9 +543,14 @@ def create_server(project_id: str) -> Server:
                             }
                         )
                     except Exception as e:
-                        results.append({"publication_number": str(pub), "error": str(e)})
+                        results.append(
+                            {"publication_number": str(pub), "error": str(e)}
+                        )
                 return [
-                    TextContent(type="text", text=json.dumps(results, ensure_ascii=False, indent=2))
+                    TextContent(
+                        type="text",
+                        text=json.dumps(results, ensure_ascii=False, indent=2),
+                    )
                 ]
 
             elif name == "batch_get_cited_by":
@@ -508,12 +558,19 @@ def create_server(project_id: str) -> Server:
                 results = []
                 for pub in pubs:
                     try:
-                        r = await asyncio.to_thread(web_fetch_cited_by_with_details, str(pub))
+                        r = await asyncio.to_thread(
+                            web_fetch_cited_by_with_details, str(pub)
+                        )
                         results.append(r)
                     except Exception as e:
-                        results.append({"publication_number": str(pub), "error": str(e)})
+                        results.append(
+                            {"publication_number": str(pub), "error": str(e)}
+                        )
                 return [
-                    TextContent(type="text", text=json.dumps(results, ensure_ascii=False, indent=2))
+                    TextContent(
+                        type="text",
+                        text=json.dumps(results, ensure_ascii=False, indent=2),
+                    )
                 ]
 
             elif name == "get_patent":
@@ -536,7 +593,10 @@ def create_server(project_id: str) -> Server:
                             TextContent(
                                 type="text",
                                 text=json.dumps(
-                                    {"error": "not_found", "message": f"Patent not found: {pub}"}
+                                    {
+                                        "error": "not_found",
+                                        "message": f"Patent not found: {pub}",
+                                    }
                                 ),
                             )
                         ]
@@ -544,21 +604,29 @@ def create_server(project_id: str) -> Server:
                 data = result.model_dump(mode="json")
                 data["_source"] = source
                 return [
-                    TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))
+                    TextContent(
+                        type="text", text=json.dumps(data, ensure_ascii=False, indent=2)
+                    )
                 ]
 
             elif name == "get_legal_status":
                 pub = str(arguments["publication_number"])
                 result = await asyncio.to_thread(web_get_legal_status, pub)
                 return [
-                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result, ensure_ascii=False, indent=2),
+                    )
                 ]
 
             elif name == "get_patent_family":
                 pub = str(arguments["publication_number"])
                 result = await client.get_family(pub)
                 return [
-                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result, ensure_ascii=False, indent=2),
+                    )
                 ]
 
             elif name == "get_patent_claims":
@@ -582,7 +650,11 @@ def create_server(project_id: str) -> Server:
                         TextContent(
                             type="text",
                             text=json.dumps(
-                                {"publication_number": pub, "claims": [], "note": note.strip()}
+                                {
+                                    "publication_number": pub,
+                                    "claims": [],
+                                    "note": note.strip(),
+                                }
                             ),
                         )
                     ]
@@ -590,7 +662,11 @@ def create_server(project_id: str) -> Server:
                     TextContent(
                         type="text",
                         text=json.dumps(
-                            {"publication_number": pub, "claims": claims, "_source": source}
+                            {
+                                "publication_number": pub,
+                                "claims": claims,
+                                "_source": source,
+                            }
                         ),
                     )
                 ]
@@ -598,14 +674,21 @@ def create_server(project_id: str) -> Server:
             elif name == "get_cited_by":
                 pub = str(arguments["publication_number"])
                 result = await asyncio.to_thread(web_fetch_cited_by_with_details, pub)
-                return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+                return [
+                    TextContent(
+                        type="text", text=json.dumps(result, ensure_ascii=False)
+                    )
+                ]
 
             elif name == "competitor_citation_matrix":
                 pubs = list(arguments["publication_numbers"])
                 keywords = list(arguments["competitor_keywords"])
                 result = await asyncio.to_thread(web_competitor_matrix, pubs, keywords)
                 return [
-                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result, ensure_ascii=False, indent=2),
+                    )
                 ]
 
             elif name == "bidirectional_citation_graph":
@@ -616,7 +699,10 @@ def create_server(project_id: str) -> Server:
                     web_bidirectional_graph, assignee, keywords_comp, limit
                 )
                 return [
-                    TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result, ensure_ascii=False, indent=2),
+                    )
                 ]
 
             else:
@@ -676,7 +762,9 @@ async def main_stdio() -> None:
     server = create_server(GCP_PROJECT_ID)
 
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+        await server.run(
+            read_stream, write_stream, server.create_initialization_options()
+        )
 
 
 async def main_http(port: int, host: str = "0.0.0.0") -> None:
@@ -701,7 +789,9 @@ async def main_http(port: int, host: str = "0.0.0.0") -> None:
 
     async def sse_app(scope: Any, receive: Any, send: Any) -> None:
         async with sse.connect_sse(scope, receive, send) as streams:
-            await server.run(streams[0], streams[1], server.create_initialization_options())
+            await server.run(
+                streams[0], streams[1], server.create_initialization_options()
+            )
 
     async def handle_health(request: Any) -> Response:
         return Response(

@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.9.0 (2026-07-05) — Cost Gate Hardening (deploy v2.12)
+
+Three-layer cost gate closed:
+
+- **cost_limit explicit surfacing** — budget exhaustion returns `{"error": "cost_limit"}` instead of a silent `[]`; batch items tagged individually; `get_family` step-1 now logs `[COST]`.
+- **`maximum_bytes_billed` hard cap** — every real execution capped at 500 GB (env `PATENT_MCP_MAX_BYTES_BILLED_GB`); BigQuery aborts over-limit queries **without billing**. All four tool paths converge on `BigQueryClient._execute()`.
+- **Engine error mapping** — `bytesBilledLimitExceeded` / `quotaExceeded` (project daily custom quota) raise `BigQueryCostError` → MCP `cost_limit`.
+- Project-level quota: 5 TiB/day custom quota on `leafy-summer-499803-k6` (GCP console, no code).
+
+---
+
 ## v1.7.0 (2026-06-24) — CN Web Search Fallback
 
 **Major feature:** CN patent web search fallback. BigQuery CPC coverage for Chinese patents is sparse in some CPC classes. `search_patents` now falls back to web search when BigQuery returns fewer results than expected.

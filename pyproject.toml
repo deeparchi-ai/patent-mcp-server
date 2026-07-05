@@ -1,6 +1,6 @@
 [project]
 name = "deeparchi-patent-mcp"
-version = "1.8.0"
+version = "1.9.0"
 description = "Global patent MCP server — search 1.4B patents via BigQuery + Google Patents. MIT. Agent-native."
 readme = "README.md"
 license = "MIT"

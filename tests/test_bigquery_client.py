@@ -115,7 +115,8 @@ class TestCostLogging:
 
         mock_bq.query.side_effect = [step1_job, step2_job]
 
-        asyncio.new_event_loop().run_until_complete(client.get_family("US-1-A"))
+        result = asyncio.run(client.get_family("US-1-A"))
 
         err = capsys.readouterr().err
         assert "[COST] get_family lookup: 5.000 GB scanned" in err
+        assert result["publication_number"] == "US-1-A"

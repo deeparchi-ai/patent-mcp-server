@@ -47,7 +47,7 @@ class TestToolRegistration:
 
             server = create_server("test-project")
             fn = server.request_handlers[ListToolsRequest]
-            result = asyncio.new_event_loop().run_until_complete(
+            result = asyncio.run(
                 fn(ListToolsRequest(method="tools/list", params=None))
             )
             names = [t.name for t in result.root.tools]
@@ -70,7 +70,7 @@ class TestSearchPatentsHandler:
             server = create_server("test-project")
 
             fn = server.request_handlers[CallToolRequest]
-            result = asyncio.new_event_loop().run_until_complete(
+            result = asyncio.run(
                 fn(_make_call_req("search_patents", {"query": "AI"}))
             )
             assert "invalid_input" in result.root.content[0].text
@@ -88,7 +88,7 @@ class TestSearchPatentsHandler:
             server = create_server("test-project")
 
             fn = server.request_handlers[CallToolRequest]
-            result = asyncio.new_event_loop().run_until_complete(
+            result = asyncio.run(
                 fn(
                     _make_call_req(
                         "search_patents",
@@ -118,7 +118,7 @@ class TestGetPatentHandler:
             server = create_server("test-project")
 
             fn = server.request_handlers[CallToolRequest]
-            result = asyncio.new_event_loop().run_until_complete(
+            result = asyncio.run(
                 fn(_make_call_req("get_patent", {"publication_number": "CN-0000000-A"}))
             )
             assert "not_found" in result.root.content[0].text
@@ -134,7 +134,7 @@ class TestGetPatentHandler:
             server = create_server("test-project")
 
             fn = server.request_handlers[CallToolRequest]
-            result = asyncio.new_event_loop().run_until_complete(
+            result = asyncio.run(
                 fn(_make_call_req("nonexistent_tool", {}))
             )
             assert "Unknown tool" in result.root.content[0].text
@@ -162,7 +162,7 @@ class TestCostLimitSemantics:
 
             server = create_server("test-project")
             fn = server.request_handlers[CallToolRequest]
-            return asyncio.new_event_loop().run_until_complete(
+            return asyncio.run(
                 fn(_make_call_req("search_patents", args))
             )
 
@@ -220,7 +220,7 @@ class TestCostLimitSemantics:
 
             server = create_server("test-project")
             fn = server.request_handlers[CallToolRequest]
-            result = asyncio.new_event_loop().run_until_complete(
+            result = asyncio.run(
                 fn(_make_call_req("batch_get_patents", {"publication_numbers": ["US-1-A"]}))
             )
         text = result.root.content[0].text

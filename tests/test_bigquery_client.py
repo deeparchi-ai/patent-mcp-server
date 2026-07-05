@@ -180,3 +180,16 @@ class TestHardCostCap:
         asyncio.run(client.get_patent_claims("US-2-B"))  # different patent → cache miss
         cfg_after = mock_bq.query.call_args.kwargs["job_config"]
         assert cfg_after.maximum_bytes_billed == 42 * 10**9
+
+    def test_cap_is_read_lazily_at_query_time(self, monkeypatch) -> None:
+        import asyncio
+
+        client, mock_bq = self._client_with_job(rows=[{"text": "claim 1"}])
+        asyncio.run(client.get_patent_claims("US-1-A"))
+        first = mock_bq.query.call_args.kwargs["job_config"].maximum_bytes_billed
+        monkeypatch.setenv("PATENT_MCP_MAX_BYTES_BILLED_GB", "7")
+        client._query_cache.clear()  # bypass memoization; second call must hit query path
+        asyncio.run(client.get_patent_claims("US-1-A"))
+        second = mock_bq.query.call_args.kwargs["job_config"].maximum_bytes_billed
+        assert first == 500 * 10**9
+        assert second == 7 * 10**9

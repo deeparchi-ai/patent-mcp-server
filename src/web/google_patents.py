@@ -34,12 +34,11 @@ FIRECRAWL_API_KEY = os.environ.get("FIRECRAWL_API_KEY", "fc-c53557ee24874f9bbce9
 FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v1/search"
 
 # Proxy for Google Patents (direct access blocked by CAPTCHA 2026-06-24)
-# Inherits HTTPS_PROXY from environment, or defaults to Clash Verge proxy
+# Inherits HTTPS_PROXY from environment. On Cloud Run (GCP), direct access
+# to Google services is preferred — no proxy needed.
 PROXIES = (
-    {
-        "https": os.environ.get("HTTPS_PROXY", "http://127.0.0.1:7897"),
-    }
-    if os.environ.get("HTTPS_PROXY") or True
+    {"https": os.environ["HTTPS_PROXY"]}
+    if os.environ.get("HTTPS_PROXY") and "7897" in os.environ.get("HTTPS_PROXY", "")
     else None
 )
 
@@ -119,6 +118,26 @@ class _ClaimParser(HTMLParser):
                     self.claims.append(" ".join(self._current))
 
 
+def _retry_request(url: str, max_retries: int = 3) -> requests.Response:
+    """GET with retry + exponential backoff for transient 5xx errors."""
+    import time as _time
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
+            if resp.status_code < 500:
+                return resp
+            logger.warning("Google Patents %d (attempt %d/%d)", resp.status_code, attempt+1, max_retries)
+        except requests.RequestException as e:
+            last_exc = e
+            logger.warning("Google Patents request failed (attempt %d/%d): %s", attempt+1, max_retries, e)
+        if attempt < max_retries - 1:
+            _time.sleep(2 ** attempt)
+    if last_exc:
+        raise last_exc
+    return resp  # type: ignore[possibly-unbound]
+
+
 def fetch_patent(publication_number: str) -> PatentDetail:
     """Fetch patent details from Google Patents web page (free, no BigQuery cost)."""
 
@@ -127,7 +146,7 @@ def fetch_patent(publication_number: str) -> PatentDetail:
     url = GOOGLE_PATENTS_URL.format(pub=pub_clean)
 
     logger.info("Fetching %s", url)
-    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
+    resp = _retry_request(url)
     resp.raise_for_status()
     resp.encoding = "utf-8"
     html = resp.text

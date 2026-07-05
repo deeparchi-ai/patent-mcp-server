@@ -28,6 +28,49 @@ from web.google_patents import competitor_citation_matrix as web_competitor_matr
 from web.google_patents import fetch_cited_by_with_details as web_fetch_cited_by_with_details
 from web.google_patents import fetch_claims as web_fetch_claims
 from web.google_patents import fetch_patent as web_fetch_patent
+
+# ── Agent Card — machine-readable MCP server description ──────────────────────
+# Used by AI agents to auto-discover, evaluate, and configure this server.
+# Served at /.well-known/agent-card.json
+_AGENT_CARD_JSON = json.dumps({
+    "name": "Patent MCP Server",
+    "description": (
+        "Search and analyze 140M+ global patents via Google Patents BigQuery. "
+        "For patent landscape analysis, competitor portfolio tracking, prior art "
+        "search, and IP due diligence. 10 tools: search, detail lookup, claims, "
+        "legal status, family, citations, competitor matrix, citation graph."
+    ),
+    "use_cases": [
+        "Competitor patent portfolio analysis and tracking",
+        "Technology landscape mapping and trend analysis",
+        "Prior art search for patent applications",
+        "Patent family and citation network analysis",
+        "IP due diligence for M&A, investment, or licensing",
+    ],
+    "mcp_config": {
+        "transport": "sse",
+        "url": "https://patent-mcp-494814528402.us-central1.run.app/sse/",
+    },
+    "auth": "none",
+    "pricing": "free",
+    "data_sources": [
+        "Google Patents Public Datasets (BigQuery) — full-text search",
+        "Google Patents web pages — real-time legal status",
+    ],
+    "maintainer": {
+        "name": "DeepArchi",
+        "github": "https://github.com/deeparchi-ai/patent-mcp-server",
+    },
+    "tools": 10,
+    "limitations": [
+        "BigQuery sandbox: 1 TB/month free, then throttled",
+        "Hosted in us-central1, ~200ms latency from Asia-Pacific",
+        "Google Patents web scraping subject to rate limits (retry with backoff)",
+        "No authentication required — public data only",
+    ],
+    "protocol": "MCP (Model Context Protocol) over SSE",
+    "version": "1.8.0",
+})
 from web.google_patents import web_search_patents
 from web.legal_status import get_legal_status as web_get_legal_status
 
@@ -586,12 +629,22 @@ async def main_http(port: int, host: str = "0.0.0.0") -> None:
             media_type="application/json",
         )
 
+    async def handle_agent_card(request: Any) -> Response:
+        return Response(
+            _AGENT_CARD_JSON,
+            media_type="application/json",
+        )
+
+    async def handle_post_sse(scope: Any, receive: Any, send: Any) -> None:
+        await sse.handle_post_message(scope, receive, send)
+
     app = Starlette(
         debug=False,
         routes=[
+            Mount("/sse/messages", app=handle_post_sse),
             Mount("/sse", app=sse_app),
-            Mount("/messages/", app=sse.handle_post_message),
             Route("/health", endpoint=handle_health),
+            Route("/.well-known/agent-card.json", endpoint=handle_agent_card),
         ],
     )
 

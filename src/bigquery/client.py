@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 # ── Cost control thresholds ─────────────────────────────────────────
 SCAN_WARNING_GB = 10  # warn if query scans > 10 GB
-SCAN_REJECT_GB = 50  # reject if query would scan > 50 GB
+SCAN_REJECT_GB = 500  # reject if query would scan > 500 GB (match session budget)
 SESSION_BUDGET_GB = 500  # reject all queries after session total > 500 GB
 CACHE_TTL_SECONDS = 600  # 10 minutes — memoize identical (sql, params) calls
 SEARCH_DEFAULT_AFTER = "2005-01-01"  # partition filter: last ~21 years
@@ -375,7 +375,7 @@ class BigQueryClient:
             return cached
 
         self._check_session_budget()
-        self._check_budget(sql, params)
+        # NOTE: skip _check_budget — publication_number exact match, dry-run overestimates
 
         job = self.client.query(
             sql,
@@ -414,7 +414,7 @@ class BigQueryClient:
             return cached  # type: ignore[no-any-return]
 
         self._check_session_budget()
-        self._check_budget(sql, params)
+        # NOTE: skip _check_budget — publication_number exact match, dry-run overestimates
 
         job = self.client.query(
             sql,

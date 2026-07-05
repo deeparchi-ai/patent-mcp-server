@@ -109,10 +109,18 @@ def search_patents_query(
 
 def get_patent_query(publication_number: str) -> tuple[str, list[ScalarQueryParameter]]:
     """Build query for single patent lookup."""
+    # Parse country code from publication_number (e.g., "US-7650331-B1" → "US")
+    country = publication_number.split("-")[0] if "-" in publication_number else ""
     params: list[ScalarQueryParameter] = [
         ScalarQueryParameter("pub_number", "STRING", publication_number),
     ]
+    if country:
+        params.append(ScalarQueryParameter("country", "STRING", country))
     table = "`patents-public-data.patents.publications`"
+
+    extra_where = ""
+    if country:
+        extra_where = "\n          AND country_code = @country"
 
     sql = f"""
         SELECT
@@ -140,7 +148,7 @@ def get_patent_query(publication_number: str) -> tuple[str, list[ScalarQueryPara
             ipc,
             citation
         FROM {table}
-        WHERE publication_number = @pub_number
+        WHERE publication_number = @pub_number{extra_where}
         LIMIT 1
     """
     return sql, params
@@ -186,6 +194,7 @@ def get_family_query(family_id: str) -> tuple[str, list[ScalarQueryParameter]]:
              WHERE language='zh' LIMIT 1) AS title_zh
         FROM `patents-public-data.patents.publications`
         WHERE family_id = @family_id
+          AND filing_date >= 20050101
         ORDER BY filing_date
     """
     return sql, params

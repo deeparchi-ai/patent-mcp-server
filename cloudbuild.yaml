@@ -1,0 +1,7 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'us-central1-docker.pkg.dev/leafy-summer-499803-k6/patent-mcp/patent-mcp:v2.11', '.']
+images:
+- 'us-central1-docker.pkg.dev/leafy-summer-499803-k6/patent-mcp/patent-mcp:v2.11'
+serviceAccount: 'projects/leafy-summer-499803-k6/serviceAccounts/patent-mcp-server@leafy-summer-499803-k6.iam.gserviceaccount.com'
+logsBucket: 'gs://leafy-summer-499803-k6_cloudbuild/logs'

@@ -127,15 +127,17 @@ def _retry_request(url: str, max_retries: int = 3) -> requests.Response:
             resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
             if resp.status_code < 500:
                 return resp
-            logger.warning("Google Patents %d (attempt %d/%d)", resp.status_code, attempt+1, max_retries)
+            logger.warning("Google Patents %d (attempt %d/%d)", resp.status_code,
+                             attempt+1, max_retries)
         except requests.RequestException as e:
             last_exc = e
-            logger.warning("Google Patents request failed (attempt %d/%d): %s", attempt+1, max_retries, e)
+            logger.warning("Google Patents request failed (attempt %d/%d): %s",
+                             attempt+1, max_retries, e)
         if attempt < max_retries - 1:
             _time.sleep(2 ** attempt)
     if last_exc:
         raise last_exc
-    return resp  # type: ignore[possibly-unbound]
+    return resp
 
 
 def fetch_patent(publication_number: str) -> PatentDetail:

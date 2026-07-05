@@ -28,6 +28,8 @@ from web.google_patents import competitor_citation_matrix as web_competitor_matr
 from web.google_patents import fetch_cited_by_with_details as web_fetch_cited_by_with_details
 from web.google_patents import fetch_claims as web_fetch_claims
 from web.google_patents import fetch_patent as web_fetch_patent
+from web.google_patents import web_search_patents
+from web.legal_status import get_legal_status as web_get_legal_status
 
 # ── Agent Card — machine-readable MCP server description ──────────────────────
 # Used by AI agents to auto-discover, evaluate, and configure this server.
@@ -129,8 +131,6 @@ _AGENT_CARD_JSON = json.dumps({
     "protocol": "MCP (Model Context Protocol) over SSE",
     "version": "1.9.0",
 })
-from web.google_patents import web_search_patents
-from web.legal_status import get_legal_status as web_get_legal_status
 
 logger = logging.getLogger("patent-mcp-server")
 

@@ -500,17 +500,13 @@ def create_server(project_id: str) -> Server:
                     return [
                         TextContent(
                             type="text",
-                            text=json.dumps(
-                                {"error": "cost_limit", "message": str(cost_blocked)}
-                            ),
+                            text=json.dumps({"error": "cost_limit", "message": str(cost_blocked)}),
                         )
                     ]
 
                 data = [r.model_dump(mode="json") for r in result]
                 return [
-                    TextContent(
-                        type="text", text=json.dumps(data, ensure_ascii=False, indent=2)
-                    )
+                    TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))
                 ]
 
             elif name == "batch_get_patents":
@@ -543,9 +539,7 @@ def create_server(project_id: str) -> Server:
                             }
                         )
                     except Exception as e:
-                        results.append(
-                            {"publication_number": str(pub), "error": str(e)}
-                        )
+                        results.append({"publication_number": str(pub), "error": str(e)})
                 return [
                     TextContent(
                         type="text",
@@ -558,14 +552,10 @@ def create_server(project_id: str) -> Server:
                 results = []
                 for pub in pubs:
                     try:
-                        r = await asyncio.to_thread(
-                            web_fetch_cited_by_with_details, str(pub)
-                        )
+                        r = await asyncio.to_thread(web_fetch_cited_by_with_details, str(pub))
                         results.append(r)
                     except Exception as e:
-                        results.append(
-                            {"publication_number": str(pub), "error": str(e)}
-                        )
+                        results.append({"publication_number": str(pub), "error": str(e)})
                 return [
                     TextContent(
                         type="text",
@@ -604,9 +594,7 @@ def create_server(project_id: str) -> Server:
                 data = result.model_dump(mode="json")
                 data["_source"] = source
                 return [
-                    TextContent(
-                        type="text", text=json.dumps(data, ensure_ascii=False, indent=2)
-                    )
+                    TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))
                 ]
 
             elif name == "get_legal_status":
@@ -674,11 +662,7 @@ def create_server(project_id: str) -> Server:
             elif name == "get_cited_by":
                 pub = str(arguments["publication_number"])
                 result = await asyncio.to_thread(web_fetch_cited_by_with_details, pub)
-                return [
-                    TextContent(
-                        type="text", text=json.dumps(result, ensure_ascii=False)
-                    )
-                ]
+                return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
 
             elif name == "competitor_citation_matrix":
                 pubs = list(arguments["publication_numbers"])
@@ -762,9 +746,7 @@ async def main_stdio() -> None:
     server = create_server(GCP_PROJECT_ID)
 
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream, write_stream, server.create_initialization_options()
-        )
+        await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
 async def main_http(port: int, host: str = "0.0.0.0") -> None:
@@ -789,9 +771,7 @@ async def main_http(port: int, host: str = "0.0.0.0") -> None:
 
     async def sse_app(scope: Any, receive: Any, send: Any) -> None:
         async with sse.connect_sse(scope, receive, send) as streams:
-            await server.run(
-                streams[0], streams[1], server.create_initialization_options()
-            )
+            await server.run(streams[0], streams[1], server.create_initialization_options())
 
     async def handle_health(request: Any) -> Response:
         return Response(

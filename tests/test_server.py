@@ -152,9 +152,7 @@ class TestCostLimitSemantics:
         with (
             patch("server.BigQueryClient") as mock_cls,
             patch("bigquery.client.bigquery.Client", MagicMock()),
-            patch(
-                "server.web_search_patents", MagicMock(return_value=web_results or [])
-            ),
+            patch("server.web_search_patents", MagicMock(return_value=web_results or [])),
         ):
             mock_cls.return_value = mock_client
             from server import create_server
@@ -170,9 +168,7 @@ class TestCostLimitSemantics:
         mock_client.search_patents.side_effect = BigQueryCostError(
             "Session budget exhausted: 513.3 GB used"
         )
-        result = self._run_search(
-            mock_client, {"query": "neural network", "country": "US"}
-        )
+        result = self._run_search(mock_client, {"query": "neural network", "country": "US"})
         text = result.root.content[0].text
         assert "cost_limit" in text
         assert "Session budget exhausted" in text
@@ -212,15 +208,11 @@ class TestCostLimitSemantics:
         from bigquery.client import BigQueryCostError
 
         mock_client = AsyncMock()
-        mock_client.get_patent.side_effect = BigQueryCostError(
-            "Session budget exhausted"
-        )
+        mock_client.get_patent.side_effect = BigQueryCostError("Session budget exhausted")
         with (
             patch("server.BigQueryClient") as mock_cls,
             patch("bigquery.client.bigquery.Client", MagicMock()),
-            patch(
-                "server.web_fetch_patent", MagicMock(side_effect=Exception("web down"))
-            ),
+            patch("server.web_fetch_patent", MagicMock(side_effect=Exception("web down"))),
         ):
             mock_cls.return_value = mock_client
             from server import create_server
@@ -228,11 +220,7 @@ class TestCostLimitSemantics:
             server = create_server("test-project")
             fn = server.request_handlers[CallToolRequest]
             result = asyncio.run(
-                fn(
-                    _make_call_req(
-                        "batch_get_patents", {"publication_numbers": ["US-1-A"]}
-                    )
-                )
+                fn(_make_call_req("batch_get_patents", {"publication_numbers": ["US-1-A"]}))
             )
         text = result.root.content[0].text
         assert "cost_limit" in text

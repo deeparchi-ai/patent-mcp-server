@@ -411,6 +411,7 @@ def create_server(project_id: str) -> Server:
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         try:
             if name == "search_patents":
+                cost_blocked: BigQueryCostError | None = None
                 try:
                     result = await client.search_patents(
                         query=arguments.get("query"),
@@ -428,6 +429,7 @@ def create_server(project_id: str) -> Server:
                         cost_err,
                     )
                     result = []
+                    cost_blocked = cost_err
 
                 # Web search fallback: if BigQuery returns 0 results (or is cost-blocked)
                 # and CPC is set, try SearXNG web search + Google Patents enrichment.
@@ -452,6 +454,18 @@ def create_server(project_id: str) -> Server:
                             result = web_results
                             logger.info("Web fallback returned %d results", len(result))
 
+                # v2.12: budget exhaustion must be explicit — a silent [] reads
+                # as "no results" to the calling agent, which is misleading.
+                if not result and cost_blocked is not None:
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {"error": "cost_limit", "message": str(cost_blocked)}
+                            ),
+                        )
+                    ]
+
                 data = [r.model_dump(mode="json") for r in result]
                 return [
                     TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))
@@ -475,6 +489,14 @@ def create_server(project_id: str) -> Server:
                                 results.append(
                                     {"publication_number": pub_clean, "error": "not_found"}
                                 )
+                    except BigQueryCostError as e:
+                        results.append(
+                            {
+                                "publication_number": str(pub),
+                                "error": "cost_limit",
+                                "message": str(e),
+                            }
+                        )
                     except Exception as e:
                         results.append({"publication_number": str(pub), "error": str(e)})
                 return [

@@ -460,7 +460,16 @@ class BigQueryClient:
                 ),
             )
             rows = list(job.result())
+            gb = (job.total_bytes_processed or 0) / 1e9
             self._session_bytes_billed += job.total_bytes_processed or 0
+            import sys
+
+            print(
+                f"[COST] get_family lookup: {gb:.3f} GB scanned "
+                f"(session: {self._session_bytes_billed / 1e9:.1f}/{SESSION_BUDGET_GB} GB)",
+                file=sys.stderr,
+                flush=True,
+            )
             if not rows:
                 raise PatentNotFoundError(f"Patent not found: {publication_number}")
             detail = _build_patent_detail(dict(rows[0]))

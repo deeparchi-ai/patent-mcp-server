@@ -146,3 +146,82 @@ class TestServerErrorHandling:
             from server import create_server
 
             create_server("")
+
+
+class TestCostLimitSemantics:
+    """v2.12: budget exhaustion must surface as explicit cost_limit — never a silent []."""
+
+    def _run_search(self, mock_client, args, web_results=None):
+        with (
+            patch("server.BigQueryClient") as mock_cls,
+            patch("bigquery.client.bigquery.Client", MagicMock()),
+            patch("server.web_search_patents", MagicMock(return_value=web_results or [])),
+        ):
+            mock_cls.return_value = mock_client
+            from server import create_server
+
+            server = create_server("test-project")
+            fn = server.request_handlers[CallToolRequest]
+            return asyncio.new_event_loop().run_until_complete(
+                fn(_make_call_req("search_patents", args))
+            )
+
+    def test_search_cost_blocked_no_fallback_returns_cost_limit(self) -> None:
+        from bigquery.client import BigQueryCostError
+
+        mock_client = AsyncMock()
+        mock_client.search_patents.side_effect = BigQueryCostError(
+            "Session budget exhausted: 513.3 GB used"
+        )
+        result = self._run_search(mock_client, {"query": "neural network", "country": "US"})
+        text = result.root.content[0].text
+        assert "cost_limit" in text
+        assert "Session budget exhausted" in text
+
+    def test_search_cost_blocked_empty_fallback_returns_cost_limit(self) -> None:
+        from bigquery.client import BigQueryCostError
+
+        mock_client = AsyncMock()
+        mock_client.search_patents.side_effect = BigQueryCostError(
+            "Session budget exhausted: 513.3 GB used"
+        )
+        result = self._run_search(
+            mock_client, {"query": "chip", "cpc": "H01L", "country": "CN"}, web_results=[]
+        )
+        text = result.root.content[0].text
+        assert "cost_limit" in text
+
+    def test_search_cost_blocked_fallback_success_returns_results(self) -> None:
+        from bigquery.client import BigQueryCostError
+
+        mock_client = AsyncMock()
+        mock_client.search_patents.side_effect = BigQueryCostError("budget gone")
+        web_hit = MagicMock()
+        web_hit.model_dump.return_value = {"publication_number": "CN-118888888-A"}
+        result = self._run_search(
+            mock_client, {"query": "chip", "cpc": "H01L", "country": "CN"}, web_results=[web_hit]
+        )
+        text = result.root.content[0].text
+        assert "cost_limit" not in text
+        assert "CN-118888888-A" in text
+
+    def test_batch_get_patents_cost_blocked_item_tagged_cost_limit(self) -> None:
+        from bigquery.client import BigQueryCostError
+
+        mock_client = AsyncMock()
+        mock_client.get_patent.side_effect = BigQueryCostError("Session budget exhausted")
+        with (
+            patch("server.BigQueryClient") as mock_cls,
+            patch("bigquery.client.bigquery.Client", MagicMock()),
+            patch("server.web_fetch_patent", MagicMock(side_effect=Exception("web down"))),
+        ):
+            mock_cls.return_value = mock_client
+            from server import create_server
+
+            server = create_server("test-project")
+            fn = server.request_handlers[CallToolRequest]
+            result = asyncio.new_event_loop().run_until_complete(
+                fn(_make_call_req("batch_get_patents", {"publication_numbers": ["US-1-A"]}))
+            )
+        text = result.root.content[0].text
+        assert "cost_limit" in text

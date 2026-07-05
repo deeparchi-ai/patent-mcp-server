@@ -90,3 +90,32 @@ class TestErrorClasses:
             raise PatentNotFoundError("CN-0000000-A")
         # PatentNotFoundError is a subclass of BigQueryError
         assert issubclass(PatentNotFoundError, BigQueryError)
+
+
+class TestCostLogging:
+    """v2.12: every BigQuery execution path must log [COST] with bytes scanned."""
+
+    def test_get_family_step1_lookup_logs_cost(self, capsys) -> None:
+        import asyncio
+        from unittest.mock import MagicMock
+
+        client = BigQueryClient(project_id="test-project")
+        mock_bq = MagicMock()
+        client._client = mock_bq
+
+        step1_job = MagicMock()
+        step1_job.result.return_value = [
+            {"publication_number": "US-1-A", "family_id": "F123", "country_code": "US"}
+        ]
+        step1_job.total_bytes_processed = int(5e9)
+
+        step2_job = MagicMock()
+        step2_job.result.return_value = []
+        step2_job.total_bytes_processed = int(1e9)
+
+        mock_bq.query.side_effect = [step1_job, step2_job]
+
+        asyncio.new_event_loop().run_until_complete(client.get_family("US-1-A"))
+
+        err = capsys.readouterr().err
+        assert "[COST] get_family lookup: 5.000 GB scanned" in err

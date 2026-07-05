@@ -28,6 +28,7 @@ from bigquery.client import (
     BigQueryError,
     PatentNotFoundError,
 )
+from web.company_summary import get_company_summary
 from web.google_patents import bidirectional_citation_graph as web_bidirectional_graph
 from web.google_patents import competitor_citation_matrix as web_competitor_matrix
 from web.google_patents import (
@@ -47,8 +48,9 @@ _AGENT_CARD_JSON = json.dumps(
         "description": (
             "Search and analyze 140M+ global patents via Google Patents BigQuery. "
             "For patent landscape analysis, competitor portfolio tracking, prior art "
-            "search, and IP due diligence. 10 tools: search, detail lookup, claims, "
-            "legal status, family, citations, competitor matrix, citation graph."
+            "search, and IP due diligence. 11 tools: search, detail lookup, claims, "
+            "legal status, family, citations, competitor matrix, citation graph, "
+            "company summary."
         ),
         "use_cases": [
             "Competitor patent portfolio analysis and tracking",
@@ -111,6 +113,12 @@ _AGENT_CARD_JSON = json.dumps(
                 "jurisdictions": ["CN", "US", "EP", "JP", "KR", "WO"],
                 "modes": ["keyword", "assignee", "CPC", "date_range"],
             },
+            "company_overview": {
+                "description": "Quick patent portfolio summary by company name",
+                "output": ["total_patents", "top_areas", "jurisdictions", "risk_label"],
+                "latency": "5-10s (Playwright browser render)",
+                "cost": "Zero BigQuery cost",
+            },
             "detail": [
                 "title",
                 "abstract",
@@ -160,7 +168,7 @@ _AGENT_CARD_JSON = json.dumps(
             "name": "DeepArchi",
             "github": "https://github.com/deeparchi-ai/patent-mcp-server",
         },
-        "tools": 10,
+        "tools": 11,
         "limitations": [
             "BigQuery sandbox: 1 TB/month free, then throttled",
             "Hosted in us-central1, ~200ms latency from Asia-Pacific",
@@ -445,6 +453,31 @@ def create_server(project_id: str) -> Server:
                     "required": ["assignee_name"],
                 },
             ),
+            Tool(
+                name="company_summary",
+                description=(
+                    "Get a quick patent portfolio summary for a company."
+                    " Input a company name (Chinese or English), returns"
+                    " total patent count, top technology areas,"
+                    " jurisdiction coverage, activity level, and risk assessment."
+                    " Zero BigQuery cost — scrapes Google Patents directly."
+                    " Best for: initial company screening, competitor overview,"
+                    " due diligence triage. Typical latency: 5-10s."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "company_name": {
+                            "type": "string",
+                            "description": (
+                                "Company name in Chinese or English."
+                                " e.g. '正浩创新', 'Anker Innovations', 'DJI'"
+                            ),
+                        },
+                    },
+                    "required": ["company_name"],
+                },
+            ),
         ]
 
     @server.call_tool()  # type: ignore[untyped-decorator]
@@ -682,6 +715,16 @@ def create_server(project_id: str) -> Server:
                 result = await asyncio.to_thread(
                     web_bidirectional_graph, assignee, keywords_comp, limit
                 )
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result, ensure_ascii=False, indent=2),
+                    )
+                ]
+
+            elif name == "company_summary":
+                company = str(arguments["company_name"])
+                result = await get_company_summary(company)
                 return [
                     TextContent(
                         type="text",

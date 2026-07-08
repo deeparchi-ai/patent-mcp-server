@@ -9,10 +9,10 @@ Direct HTTP requests are blocked by Google's CAPTCHA; Playwright required.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 from typing import Any
-from collections import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -25,14 +25,18 @@ TECH_BIGRAMS = {
     "power & energy": ["power source", "power supply", "energy storage", "power conversion",
                         "battery management", "charging station", "solar cell", "fuel cell",
                         "wireless charging", "power control"],
-    "autonomous & robotics": ["autonomous driving", "autonomous vehicle", "self driving",
-                               "unmanned aerial", "mobile robot", "path planning", "obstacle detection"],
+    "autonomous & robotics": [
+        "autonomous driving", "autonomous vehicle", "self driving",
+        "unmanned aerial", "mobile robot", "path planning", "obstacle detection",
+    ],
     "semiconductor & hardware": ["integrated circuit", "semiconductor device", "printed circuit",
                                   "memory device", "display panel", "light emitting"],
     "communication & network": ["wireless communication", "data transmission", "network device",
                                  "signal processing", "antenna array", "beam forming"],
-    "biotech & pharma": ["monoclonal antibody", "nucleic acid", "amino acid", "pharmaceutical composition",
-                          "cell therapy", "gene therapy"],
+    "biotech & pharma": [
+        "monoclonal antibody", "nucleic acid", "amino acid",
+        "pharmaceutical composition", "cell therapy", "gene therapy",
+    ],
 }
 
 # Single-word tech signals (filtered: no generic apparatus/method/device/system)
@@ -142,10 +146,8 @@ def _extract_tech_areas(all_titles: list[str]) -> list[str]:
     # Then single-word signals as fallback
     for kw in TECH_SIGNALS:
         count = sum(1 for t in all_titles if kw in t.lower())
-        if count >= 2:
-            # Only add if not already covered by a bigram
-            if not any(kw in k for k in scores):
-                scores[kw] = count
+        if count >= 2 and not any(kw in k for k in scores):
+            scores[kw] = count
 
     # Sort by score, map to friendly labels
     ranked = sorted(scores, key=lambda k: scores[k], reverse=True)[:5]
@@ -180,7 +182,7 @@ def _assess_activity(patents: list[dict], total: int) -> tuple[str, str]:
         return ("none", "未发现专利")
 
 
-def _assess_risk(total: int, jd_count: int, activity: str, 
+def _assess_risk(total: int, jd_count: int, activity: str,
                  has_overseas: bool) -> tuple[str, str]:
     """Multi-dimensional risk assessment."""
     if total == 0:
@@ -200,7 +202,7 @@ def _assess_risk(total: int, jd_count: int, activity: str,
             return ("🔴 high", f"{total:,}项专利覆盖{jd_count}国，全球布局，技术壁垒高")
         elif base == "medium":
             return ("🟡 medium", f"{total:,}项专利覆盖{jd_count}国，海外有布局")
-    
+
     if base == "high":
         if jd_count >= 3:
             return ("🔴 high", f"{total:,}项专利覆盖{jd_count}国，技术壁垒较高")
@@ -214,7 +216,7 @@ def _assess_risk(total: int, jd_count: int, activity: str,
     return ("🟢 low", f"仅{total}项专利，技术壁垒低")
 
 
-def _parse_company_summary(default_html: str, newest_html: str, 
+def _parse_company_summary(default_html: str, newest_html: str,
                            company_name: str) -> dict[str, Any]:
     """Parse TWO Google Patents pages (default + newest) into summary."""
 
@@ -285,10 +287,8 @@ async def get_company_summary(company_name: str) -> dict[str, Any]:
             encoded = company_name.replace(" ", "+")
             url = f"{GOOGLE_PATENTS_URL}?assignee={encoded}"
             await page.goto(url, timeout=20000, wait_until="domcontentloaded")
-            try:
+            with contextlib.suppress(Exception):
                 await page.wait_for_selector("article", timeout=10000)
-            except Exception:
-                pass
 
             html = await page.content()
             await browser.close()

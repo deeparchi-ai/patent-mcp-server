@@ -20,33 +20,96 @@ GOOGLE_PATENTS_URL = "https://patents.google.com/"
 
 # Bigram-level tech phrase extraction (combines 2+ adjacent tech words)
 TECH_BIGRAMS = {
-    "artificial intelligence": ["machine learning", "deep learning", "neural network",
-                                 "natural language", "computer vision", "reinforcement learning"],
-    "power & energy": ["power source", "power supply", "energy storage", "power conversion",
-                        "battery management", "charging station", "solar cell", "fuel cell",
-                        "wireless charging", "power control"],
-    "autonomous & robotics": [
-        "autonomous driving", "autonomous vehicle", "self driving",
-        "unmanned aerial", "mobile robot", "path planning", "obstacle detection",
+    "artificial intelligence": [
+        "machine learning",
+        "deep learning",
+        "neural network",
+        "natural language",
+        "computer vision",
+        "reinforcement learning",
     ],
-    "semiconductor & hardware": ["integrated circuit", "semiconductor device", "printed circuit",
-                                  "memory device", "display panel", "light emitting"],
-    "communication & network": ["wireless communication", "data transmission", "network device",
-                                 "signal processing", "antenna array", "beam forming"],
+    "power & energy": [
+        "power source",
+        "power supply",
+        "energy storage",
+        "power conversion",
+        "battery management",
+        "charging station",
+        "solar cell",
+        "fuel cell",
+        "wireless charging",
+        "power control",
+    ],
+    "autonomous & robotics": [
+        "autonomous driving",
+        "autonomous vehicle",
+        "self driving",
+        "unmanned aerial",
+        "mobile robot",
+        "path planning",
+        "obstacle detection",
+    ],
+    "semiconductor & hardware": [
+        "integrated circuit",
+        "semiconductor device",
+        "printed circuit",
+        "memory device",
+        "display panel",
+        "light emitting",
+    ],
+    "communication & network": [
+        "wireless communication",
+        "data transmission",
+        "network device",
+        "signal processing",
+        "antenna array",
+        "beam forming",
+    ],
     "biotech & pharma": [
-        "monoclonal antibody", "nucleic acid", "amino acid",
-        "pharmaceutical composition", "cell therapy", "gene therapy",
+        "monoclonal antibody",
+        "nucleic acid",
+        "amino acid",
+        "pharmaceutical composition",
+        "cell therapy",
+        "gene therapy",
     ],
 }
 
 # Single-word tech signals (filtered: no generic apparatus/method/device/system)
 TECH_SIGNALS = [
-    "battery", "charging", "inverter", "solar", "photovoltaic", "motor", "sensor",
-    "lidar", "radar", "brake", "driving", "engine", "transmission",
-    "camera", "gimbal", "drone", "uav", "propeller",
-    "semiconductor", "chip", "processor", "memory", "transistor",
-    "blockchain", "encryption", "token", "ledger", "cryptographic",
-    "antibody", "protein", "gene", "cell", "pharmaceutical",
+    "battery",
+    "charging",
+    "inverter",
+    "solar",
+    "photovoltaic",
+    "motor",
+    "sensor",
+    "lidar",
+    "radar",
+    "brake",
+    "driving",
+    "engine",
+    "transmission",
+    "camera",
+    "gimbal",
+    "drone",
+    "uav",
+    "propeller",
+    "semiconductor",
+    "chip",
+    "processor",
+    "memory",
+    "transistor",
+    "blockchain",
+    "encryption",
+    "token",
+    "ledger",
+    "cryptographic",
+    "antibody",
+    "protein",
+    "gene",
+    "cell",
+    "pharmaceutical",
 ]
 
 FRIENDLY_LABELS: dict[str, str] = {
@@ -114,19 +177,19 @@ def _parse_patent_list(html: str) -> list[dict[str, Any]]:
 
         # Year — use LATEST of Priority/Filed/Granted/Published (not earliest)
         year = 0
-        year_matches = re.findall(
-            r"(?:Priority|Filed|Granted|Published)\s+(\d{4})", date_text
-        )
+        year_matches = re.findall(r"(?:Priority|Filed|Granted|Published)\s+(\d{4})", date_text)
         if year_matches:
             years = [int(y) for y in year_matches]
             year = max(years)  # Latest date = most recent activity indicator
 
-        patents.append({
-            "title": title[:120],
-            "patent_no": patent_no,
-            "jurisdictions": " ".join(jd_parts),
-            "year": year,
-        })
+        patents.append(
+            {
+                "title": title[:120],
+                "patent_no": patent_no,
+                "jurisdictions": " ".join(jd_parts),
+                "year": year,
+            }
+        )
 
     return patents
 
@@ -182,8 +245,7 @@ def _assess_activity(patents: list[dict], total: int) -> tuple[str, str]:
         return ("none", "未发现专利")
 
 
-def _assess_risk(total: int, jd_count: int, activity: str,
-                 has_overseas: bool) -> tuple[str, str]:
+def _assess_risk(total: int, jd_count: int, activity: str, has_overseas: bool) -> tuple[str, str]:
     """Multi-dimensional risk assessment."""
     if total == 0:
         return ("🟢 low", "未发现专利记录（建议确认公司名或尝试英文名）")
@@ -216,8 +278,9 @@ def _assess_risk(total: int, jd_count: int, activity: str,
     return ("🟢 low", f"仅{total}项专利，技术壁垒低")
 
 
-def _parse_company_summary(default_html: str, newest_html: str,
-                           company_name: str) -> dict[str, Any]:
+def _parse_company_summary(
+    default_html: str, newest_html: str, company_name: str
+) -> dict[str, Any]:
     """Parse TWO Google Patents pages (default + newest) into summary."""
 
     # ── Total patent count (from default page) ──
@@ -248,9 +311,7 @@ def _parse_company_summary(default_html: str, newest_html: str,
     top_areas = _extract_tech_areas(all_titles)
 
     # ── Risk ──
-    risk_label, risk_reason = _assess_risk(
-        total, len(jurisdictions), activity_level, has_overseas
-    )
+    risk_label, risk_reason = _assess_risk(total, len(jurisdictions), activity_level, has_overseas)
 
     # ── Recent patents (from newest page, top 5) ──
     recent = sorted(newest_patents, key=lambda p: p["year"], reverse=True)[:5]

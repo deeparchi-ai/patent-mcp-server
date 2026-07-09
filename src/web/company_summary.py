@@ -217,7 +217,7 @@ def _extract_tech_areas(all_titles: list[str]) -> list[str]:
     return [FRIENDLY_LABELS.get(r, r) for r in ranked]
 
 
-def _assess_activity(patents: list[dict], total: int) -> tuple[str, str]:
+def _assess_activity(patents: list[dict[str, Any]], total: int) -> tuple[str, str]:
     """Assess activity level from patent recency.
 
     Uses BOTH default-sorted sample and total count to estimate.
@@ -339,7 +339,7 @@ async def get_company_summary(company_name: str) -> dict[str, Any]:
 
     Typical latency: 5-10 seconds.
     """
-    from playwright.async_api import async_playwright  # type: ignore[import-untyped]
+    from playwright.async_api import async_playwright
 
     try:
         async with async_playwright() as p:

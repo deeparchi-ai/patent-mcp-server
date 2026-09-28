@@ -789,9 +789,7 @@ def create_server(project_id: str) -> Server:
             return [
                 TextContent(
                     type="text",
-                    text=json.dumps(
-                        {"error": "bigquery_not_configured", "message": str(e)}
-                    ),
+                    text=json.dumps({"error": "bigquery_not_configured", "message": str(e)}),
                 )
             ]
         except PatentNotFoundError as e:

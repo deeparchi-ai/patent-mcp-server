@@ -3,7 +3,7 @@
   "name": "io.github.deeparchi-ai/patent-mcp-server",
   "title": "Patent MCP Server",
   "description": "Patent search over 1.4B global records via Google Patents on BigQuery, with CN coverage.",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "repository": {
     "url": "https://github.com/deeparchi-ai/patent-mcp-server",
     "source": "github"
@@ -12,7 +12,7 @@
     {
       "registryType": "pypi",
       "identifier": "deeparchi-patent-mcp",
-      "version": "1.9.0",
+      "version": "1.9.1",
       "transport": {
         "type": "stdio"
       }

@@ -185,10 +185,52 @@ logger = logging.getLogger("patent-mcp-server")
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "")
 
 
+class BigQueryNotConfigured(RuntimeError):
+    """A BigQuery-backed tool was called but GCP_PROJECT_ID is not set.
+
+    The server must still start in this state: most tools (get_patent,
+    get_patent_claims, get_legal_status, company_summary, and the citation
+    tools) read Google Patents public pages and need no credentials at all.
+    """
+
+
+_BQ_HINT = (
+    "GCP_PROJECT_ID is not set, so BigQuery-backed tools are unavailable. "
+    "The following tools work without any credentials: get_patent, "
+    "get_patent_claims, get_legal_status, company_summary, get_cited_by, "
+    "batch_get_cited_by, competitor_citation_matrix, "
+    "bidirectional_citation_graph. To enable BigQuery-backed search, create a "
+    "Google Cloud project with the BigQuery API enabled and set GCP_PROJECT_ID."
+)
+
+
+class _LazyBigQueryClient:
+    """Defers BigQuery client construction until a tool actually needs it.
+
+    Constructing the client eagerly (as before) made the process require
+    GCP_PROJECT_ID just to start, which contradicted the README's claim that
+    most use cases need no credentials.
+    """
+
+    def __init__(self, project_id: str) -> None:
+        self._project_id = project_id
+        self._impl: Any = None
+
+    def _resolve(self) -> Any:
+        if self._impl is None:
+            if not self._project_id:
+                raise BigQueryNotConfigured(_BQ_HINT)
+            self._impl = BigQueryClient(project_id=self._project_id)
+        return self._impl
+
+    def __getattr__(self, item: str) -> Any:
+        return getattr(self._resolve(), item)
+
+
 def create_server(project_id: str) -> Server:
     """Create and configure the MCP Server with all tools registered."""
     server = Server("patent-mcp-server")
-    client = BigQueryClient(project_id=project_id)
+    client = _LazyBigQueryClient(project_id=project_id)
 
     @server.list_tools()  # type: ignore[no-untyped-call, untyped-decorator]
     async def list_tools(request: ListToolsRequest) -> list[Tool]:
@@ -740,6 +782,18 @@ def create_server(project_id: str) -> Server:
                     )
                 ]
 
+        except BigQueryNotConfigured as e:
+            # Not an error condition the caller can fix by retrying: the server
+            # simply has no BigQuery project configured, which is a supported
+            # mode. Tell the agent which tools it CAN use.
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {"error": "bigquery_not_configured", "message": str(e)}
+                    ),
+                )
+            ]
         except PatentNotFoundError as e:
             return [
                 TextContent(
@@ -782,10 +836,12 @@ async def main_stdio() -> None:
     )
 
     if not GCP_PROJECT_ID:
-        logger.error("GCP_PROJECT_ID environment variable is required")
-        sys.exit(1)
+        logger.warning(
+            "GCP_PROJECT_ID is not set — starting anyway. BigQuery-backed tools "
+            "will report how to enable them; web-backed tools work normally."
+        )
 
-    logger.info("Starting patent-mcp-server on stdio (project=%s)", GCP_PROJECT_ID)
+    logger.info("Starting patent-mcp-server on stdio (project=%s)", GCP_PROJECT_ID or "<unset>")
     server = create_server(GCP_PROJECT_ID)
 
     async with stdio_server() as (read_stream, write_stream):
@@ -806,8 +862,10 @@ async def main_http(port: int, host: str = "0.0.0.0") -> None:
     )
 
     if not GCP_PROJECT_ID:
-        logger.error("GCP_PROJECT_ID environment variable is required")
-        sys.exit(1)
+        logger.warning(
+            "GCP_PROJECT_ID is not set — starting anyway. BigQuery-backed tools "
+            "will report how to enable them; web-backed tools work normally."
+        )
 
     server = create_server(GCP_PROJECT_ID)
     sse = SseServerTransport("/messages/")

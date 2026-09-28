@@ -40,7 +40,8 @@ pip install -e .
 
 ## Quick Start
 
-Pick your agent platform and add this to its MCP config:
+After `pip install`, the `deeparchi-patent-mcp` console script is on your PATH.
+Add this to your agent platform's MCP config:
 
 ### Claude Desktop
 
@@ -48,9 +49,8 @@ Pick your agent platform and add this to its MCP config:
 {
   "mcpServers": {
     "patent-mcp": {
-      "command": "python",
-      "args": ["-m", "src.server"],
-      "cwd": "/path/to/patent-mcp-server"
+      "command": "deeparchi-patent-mcp",
+      "args": []
     }
   }
 }
@@ -65,9 +65,37 @@ Same config as Claude Desktop above.
 ```yaml
 mcp_servers:
   patent-mcp:
-    command: "python"
-    args: ["-m", "src.server"]
-    workdir: "/path/to/patent-mcp-server"
+    command: "deeparchi-patent-mcp"
+```
+
+> **BigQuery is optional.** Without `GCP_PROJECT_ID` the server starts normally and
+> the web-backed tools work with no credentials. BigQuery-backed tools return a
+> message explaining how to enable them. To turn them on, add an env var:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "patent-mcp": {
+>       "command": "deeparchi-patent-mcp",
+>       "args": [],
+>       "env": { "GCP_PROJECT_ID": "your-gcp-project" }
+>     }
+>   }
+> }
+> ```
+
+### Running from a source checkout
+
+```json
+{
+  "mcpServers": {
+    "patent-mcp": {
+      "command": "python",
+      "args": ["-m", "server"],
+      "cwd": "/path/to/patent-mcp-server/src"
+    }
+  }
+}
 ```
 
 ---

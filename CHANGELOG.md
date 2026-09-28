@@ -1,3 +1,29 @@
+## [1.9.1] — 2026-09-28
+
+### Fixed — `pip install` produced an unusable package
+
+Four defects, each hit in order by a new user following the README:
+
+1. `ModuleNotFoundError: No module named 'server'` — `setuptools` `packages.find`
+   collects only packages, so the top-level module `src/server.py` was never
+   shipped even though the console script pointed at `server:cli_main`.
+2. `ImportError: cannot import name 'cli_main'` — the entry point referenced a
+   function that did not exist; the real entry `main` is async and cannot be a
+   `console_scripts` target. Added a sync `cli_main()` wrapper.
+3. `AttributeError: 'Server' object has no attribute 'list_tools'` — the
+   requirement was `mcp>=1.0.0` with no upper bound; mcp 2.x removed the
+   lowlevel `list_tools()` decorator, so a fresh install crashed at startup.
+   Pinned `mcp>=1.0.0,<2`.
+4. `GCP_PROJECT_ID environment variable is required` at startup — the server
+   refused to start without a Google Cloud project, contradicting the README's
+   "no API key for most use cases" promise. The BigQuery client is now created
+   lazily; the server starts without credentials and BigQuery-backed tools
+   return an actionable message listing the credential-free tools.
+
+Also fixed `mcp.json` (pointed at `python -m src.server`, which only resolves
+inside a checkout) and the README Quick Start configs, which contradicted the
+`pip install` line directly above them.
+
 # Changelog
 
 ## v1.9.0 (2026-07-05) — Cost Gate Hardening (deploy v2.12)

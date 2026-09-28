@@ -1,0 +1,42 @@
+name: Publish to MCP Registry
+
+# 把本服务发布到官方 MCP 注册表 registry.modelcontextprotocol.io。
+#
+# 为什么用 OIDC 而不是交互式登录：注册表的命名空间 io.github.deeparchi-ai/*
+# 要求「以 deeparchi-ai 身份登录，或在一个属于 deeparchi-ai 的 GitHub Action 里运行」。
+# GitHub Actions 的 OIDC 令牌天然满足第二条，因此无需任何长期凭证。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main]
+    paths:
+      - server.json
+      - .github/workflows/publish-mcp-registry.yml
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # ★ OIDC 必需
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mcp-publisher
+        run: |
+          curl -sSL -o /tmp/mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz"
+          tar -xzf /tmp/mcp-publisher.tar.gz -C /tmp mcp-publisher
+          sudo install -m 0755 /tmp/mcp-publisher /usr/local/bin/mcp-publisher
+          mcp-publisher --help | head -5
+
+      - name: Validate server.json
+        run: mcp-publisher validate
+
+      - name: Authenticate via GitHub OIDC
+        run: mcp-publisher login github-oidc
+
+      - name: Publish
+        run: mcp-publisher publish

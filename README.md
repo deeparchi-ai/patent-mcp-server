@@ -1,12 +1,14 @@
 # Patent MCP Server
 
+<!-- mcp-name: io.github.deeparchi-ai/patent-mcp-server -->
+
 > 🚀 **中国专利最准确的开源 MCP。** Give your AI agent the ability to read CN patents with real accuracy — plus global coverage.
 
 [![Tests](https://img.shields.io/badge/tests-32%2F32-brightgreen)](https://github.com/deeparchi-ai/patent-mcp-server/actions)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-purple)](https://modelcontextprotocol.io/)
-[![PyPI](https://img.shields.io/badge/pypi-v1.7.0-blue)](https://pypi.org/project/deeparchi-patent-mcp/)
+[![PyPI](https://img.shields.io/badge/pypi-v1.9.0-blue)](https://pypi.org/project/deeparchi-patent-mcp/)
 
 An MCP (Model Context Protocol) server that gives AI agents access to patent data — **CN patents with CPC-aware correction**, plus US/WO global coverage. Runs locally on your machine. No external API, no subscription. Always MIT.
 

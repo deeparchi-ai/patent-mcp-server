@@ -185,7 +185,7 @@ logger = logging.getLogger("patent-mcp-server")
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "")
 
 
-class BigQueryNotConfigured(RuntimeError):
+class BigQueryNotConfiguredError(RuntimeError):
     """A BigQuery-backed tool was called but GCP_PROJECT_ID is not set.
 
     The server must still start in this state: most tools (get_patent,
@@ -219,7 +219,7 @@ class _LazyBigQueryClient:
     def _resolve(self) -> Any:
         if self._impl is None:
             if not self._project_id:
-                raise BigQueryNotConfigured(_BQ_HINT)
+                raise BigQueryNotConfiguredError(_BQ_HINT)
             self._impl = BigQueryClient(project_id=self._project_id)
         return self._impl
 
@@ -782,7 +782,7 @@ def create_server(project_id: str) -> Server:
                     )
                 ]
 
-        except BigQueryNotConfigured as e:
+        except BigQueryNotConfiguredError as e:
             # Not an error condition the caller can fix by retrying: the server
             # simply has no BigQuery project configured, which is a supported
             # mode. Tell the agent which tools it CAN use.

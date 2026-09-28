@@ -136,13 +136,27 @@ class TestGetPatentHandler:
 
 class TestServerErrorHandling:
     def test_missing_gcp_project_id(self) -> None:
-        with (
-            pytest.raises(ValueError),
-            patch("bigquery.client.bigquery.Client", MagicMock()),
-        ):
-            from server import create_server
+        """v1.9.1: no project id is a supported mode, not a startup error.
 
-            create_server("")
+        The client used to be built eagerly, so `create_server("")` raised and
+        the process could not start at all without GCP_PROJECT_ID — which
+        contradicted the README's promise that most tools need no credentials.
+        """
+        with patch("bigquery.client.bigquery.Client", MagicMock()):
+            from server import (
+                BigQueryNotConfiguredError,
+                _LazyBigQueryClient,
+                create_server,
+            )
+
+            # The server must construct successfully with no project configured.
+            assert create_server("") is not None
+
+            # Only actually using a BigQuery-backed tool reports the problem.
+            lazy = _LazyBigQueryClient("")
+            with pytest.raises(BigQueryNotConfiguredError) as excinfo:
+                lazy.search_patents(query="anything")
+            assert "GCP_PROJECT_ID" in str(excinfo.value)
 
 
 class TestCostLimitSemantics:

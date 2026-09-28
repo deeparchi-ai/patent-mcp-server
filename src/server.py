@@ -886,7 +886,16 @@ async def main() -> None:
         await main_stdio()
 
 
-if __name__ == "__main__":
+def cli_main() -> None:
+    """Sync console-script entry point (pyproject [project.scripts]).
+
+    `main` is async, so it cannot be an entry point target directly —
+    console_scripts calls a plain callable. This wrapper drives the loop.
+    """
     import asyncio
 
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    cli_main()

@@ -7,8 +7,8 @@
   "homepage": "https://github.com/deeparchi-ai/patent-mcp-server",
   "runtime": "python",
   "entrypoint": {
-    "command": "python",
-    "args": ["-m", "src.server"]
+    "command": "deeparchi-patent-mcp",
+    "args": []
   },
   "env": {},
   "capabilities": {
@@ -26,5 +26,8 @@
         "description": "Get US patent claims text by publication number"
       }
     ]
+  },
+  "install": {
+    "pypi": "deeparchi-patent-mcp"
   }
 }

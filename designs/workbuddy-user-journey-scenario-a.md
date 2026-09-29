@@ -446,7 +446,7 @@ agent_card: https://patent-mcp-494814528402.us-central1.run.app/.well-known/agen
 
 support:
   github: https://github.com/deeparchi-ai/patent-mcp-server
-  email: kuangmi@deeparchi.com.cn
+  email: user@example.com
 
 # 兼容性声明
 works_with:

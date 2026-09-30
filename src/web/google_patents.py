@@ -13,8 +13,8 @@ from datetime import date
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING, Any
 
-import requests
 import aiohttp
+import requests
 
 from models.patent import Citation, ClassificationCode, PatentBasic, PatentDetail
 
@@ -50,6 +50,7 @@ def _require_firecrawl_key() -> str:
             "export FIRECRAWL_API_KEY=... or use the BigQuery / SearXNG paths instead."
         )
     return FIRECRAWL_API_KEY
+
 
 # Proxy for Google Patents (direct access blocked by CAPTCHA 2026-06-24)
 # Inherits HTTPS_PROXY from environment. On Cloud Run (GCP), direct access
@@ -554,8 +555,9 @@ async def fetch_claims_async(publication_number: str) -> list[str]:
     timeout = aiohttp.ClientTimeout(total=30)
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
                 "https://api.firecrawl.dev/v1/scrape",
                 json={
                     "url": url,
@@ -593,24 +595,25 @@ async def fetch_claims_async(publication_number: str) -> list[str]:
                     "Content-Type": "application/json",
                 },
                 timeout=timeout,
-            ) as resp:
-                data = await resp.json()
-                result = data.get("data", data)
-                if data.get("success") and result.get("json", {}).get("claims"):
-                    claims = result["json"]["claims"]
-                    logger.info("Firecrawl async: %d claims for %s", len(claims), pub_clean)
-                    return [c["claim_text"] for c in claims if c.get("claim_text")]
-                logger.warning("Firecrawl async: empty claims for %s", pub_clean)
+            ) as resp,
+        ):
+            data = await resp.json()
+            result = data.get("data", data)
+            if data.get("success") and result.get("json", {}).get("claims"):
+                claims = result["json"]["claims"]
+                logger.info("Firecrawl async: %d claims for %s", len(claims), pub_clean)
+                return [c["claim_text"] for c in claims if c.get("claim_text")]
+            logger.warning("Firecrawl async: empty claims for %s", pub_clean)
     except Exception as e:
         logger.warning("Firecrawl async failed for %s: %s", pub_clean, e)
 
     # Fallback: static requests
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
-        resp.raise_for_status()
-        resp.encoding = "utf-8"
+        fallback_resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, proxies=PROXIES)
+        fallback_resp.raise_for_status()
+        fallback_resp.encoding = "utf-8"
         parser = _ClaimParser()
-        parser.feed(resp.text)
+        parser.feed(fallback_resp.text)
         if parser.claims:
             return parser.claims
     except Exception:
@@ -668,7 +671,7 @@ def fetch_claims(publication_number: str) -> list[str]:
             },
             timeout=30,
             # Bypass HTTPS_PROXY — Firecrawl is not Google, direct access works
-            proxies={"http": None, "https": None},
+            proxies={"http": None, "https": None},  # type: ignore[dict-item]
         )
         resp.raise_for_status()
         data = resp.json()
